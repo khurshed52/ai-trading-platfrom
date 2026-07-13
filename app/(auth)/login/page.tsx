@@ -58,9 +58,6 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const redirectTo = searchParams.get("redirect");
 
   function handleSubmit(values: LoginFormValues) {
     console.log("Form submitted with values:", values);

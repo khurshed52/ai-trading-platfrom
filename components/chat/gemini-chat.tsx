@@ -257,20 +257,20 @@ export default function GeminiChat() {
         }
         closeIcon={<X size={19} />}
         styles={{
-          content: {
-            borderRadius: 24,
-            padding: 0,
-            overflow: "hidden",
-          },
-          header: {
-            margin: 0,
-            padding: "20px 22px",
-            borderBottom: "1px solid #e2e8f0",
-          },
-          body: {
-            padding: 0,
-          },
-        }}
+            container: {
+                borderRadius: 24,
+                padding: 0,
+                overflow: "hidden",
+            },
+            header: {
+                margin: 0,
+                padding: "20px 22px",
+                borderBottom: "1px solid #e2e8f0",
+            },
+            body: {
+                padding: 0,
+            },
+            }}
       >
         <div className="flex h-[600px] max-h-[75vh] flex-col bg-slate-50">
           <div
