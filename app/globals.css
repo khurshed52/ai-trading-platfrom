@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sora), sans-serif;
+}
+
+.ant-form-item-label > label {
+    font-weight: 700;
+    color: #111827;
+} 
+
+.phone-number-input {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 54px;
+
+  overflow: hidden;
+  border: 1px solid #d8e1ef;
+  border-radius: 12px;
+  background: #ffffff;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.phone-number-input:hover {
+  border-color: #94b6f2;
+}
+
+.phone-number-input:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+}
+
+.phone-country-select {
+  width: 150px;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.phone-country-select.ant-select {
+  height: 100%;
+}
+
+.phone-country-select .ant-select-selector {
+  height: 100% !important;
+  padding-inline: 16px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.phone-country-select .ant-select-selection-wrap {
+  height: 100%;
+}
+
+.phone-country-select .ant-select-selection-item {
+  display: flex !important;
+  align-items: center !important;
+  height: 100%;
+}
+
+.phone-number-divider {
+  width: 1px;
+  margin-block: 10px;
+  flex-shrink: 0;
+  background: #d8e1ef;
+}
+
+.phone-number-native-input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 16px;
+
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.phone-number-native-input::placeholder {
+  color: #94a3b8;
+}
+
+.phone-number-input-disabled {
+  cursor: not-allowed;
+  background: #f5f5f5;
+}
+
+.phone-number-input-disabled .phone-number-native-input {
+  cursor: not-allowed;
+  color: rgb(0 0 0 / 25%);
+}
+
+/* Ant Design validation error */
+.ant-form-item-has-error .phone-number-input {
+  border-color: #ff4d4f;
+}
+
+.ant-form-item-has-error .phone-number-input:focus-within {
+  border-color: #ff4d4f;
+  box-shadow: 0 0 0 3px rgb(255 77 79 / 10%);
+}
