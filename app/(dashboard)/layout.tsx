@@ -1,14 +1,16 @@
-import Navbar from "@/components/Navbar";
+import type { ReactNode } from "react";
+import Shell from "@/components/layouts/shell";
+
+type WebsiteLayoutProps = {
+  children: ReactNode;
+};
 
 export default function WebsiteLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}: WebsiteLayoutProps) {
   return (
-    <>
-      <Navbar />
-      <main>{children}</main>
-    </>
+    <Shell>
+      {children}
+    </Shell>
   );
 }

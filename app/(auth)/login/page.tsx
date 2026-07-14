@@ -63,7 +63,7 @@ export default function LoginPage() {
     console.log("Form submitted with values:", values);
 
     // Replace this with your login API request.
-   // router.push(redirectTo || ROUTES.AUTH.dashboard);
+    router.push(ROUTES.PUBLIC.DASHBOARD);
   }
 
   function handleGoogleLogin() {
@@ -107,6 +107,8 @@ export default function LoginPage() {
             layout="vertical"
             requiredMark={false}
             initialValues={{
+              email: "test@gmail.com",
+              password: "password",
               remember: true,
             }}
             onFinish={handleSubmit}

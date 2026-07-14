@@ -1,13 +1,53 @@
 import { GoogleGenAI } from "@google/genai";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type ChatRequest = {
   message?: string;
 };
 
+const apiKey = process.env.GEMINI_API_KEY;
+
+const ai = apiKey
+  ? new GoogleGenAI({
+      apiKey,
+    })
+  : null;
+
+const SYSTEM_INSTRUCTION = `
+You are the TradePro support assistant.
+
+Help users with:
+- account registration
+- login and password support
+- platform navigation
+- trading terminology
+- account security
+- general TradePro product support
+
+Keep every response concise, clear, and helpful.
+
+Do not provide:
+- personalized financial advice
+- guaranteed returns
+- direct buy or sell instructions
+- invented market prices
+`;
+
 export async function POST(request: Request) {
   try {
+    if (!ai) {
+      return Response.json(
+        {
+          message: "GEMINI_API_KEY is not configured.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
     const body = (await request.json()) as ChatRequest;
     const message = body.message?.trim();
 
@@ -22,69 +62,98 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return Response.json(
-        {
-          message: "GEMINI_API_KEY is not configured.",
+    const geminiStream =
+      await ai.models.generateContentStream({
+        model: "gemini-3.1-flash-lite",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: message,
+              },
+            ],
+          },
+        ],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          temperature: 0.4,
+          maxOutputTokens: 500,
         },
-        {
-          status: 500,
-        },
-      );
-    }
-
-    const ai = new GoogleGenAI({
-      apiKey,
-    });
-
-    const stream = await ai.interactions.create({
-      model: "gemini-3.5-flash",
-      input: message,
-      stream: true,
-      system_instruction:
-        "You are the TradePro support assistant. Give concise, helpful answers about account registration, platform navigation, trading terminology, security, and general product support. Do not provide personalized financial advice, guaranteed returns, or direct buy and sell instructions.",
-    });
+      });
 
     const encoder = new TextEncoder();
 
-    const readableStream = new ReadableStream<Uint8Array>({
+    const responseStream = new ReadableStream<Uint8Array>({
       async start(controller) {
+        let receivedText = false;
+
         try {
-          for await (const event of stream) {
-            if (
-              event.event_type === "step.delta" &&
-              event.delta.type === "text"
-            ) {
-              controller.enqueue(
-                encoder.encode(event.delta.text),
-              );
+          for await (const chunk of geminiStream) {
+            const text = chunk.text;
+
+            if (!text) {
+              continue;
             }
+
+            receivedText = true;
+
+            controller.enqueue(
+              encoder.encode(text),
+            );
+          }
+
+          if (!receivedText) {
+            controller.enqueue(
+              encoder.encode(
+                "I could not generate a response. Please try again.",
+              ),
+            );
           }
 
           controller.close();
         } catch (error) {
-          console.error("Gemini streaming error:", error);
+          console.error(
+            "Gemini streaming error:",
+            error,
+          );
 
-          controller.error(error);
+          controller.enqueue(
+            encoder.encode(
+              "\nSorry, something went wrong while generating the response.",
+            ),
+          );
+
+          controller.close();
         }
+      },
+
+      cancel() {
+        console.log("Gemini stream was cancelled.");
       },
     });
 
-    return new Response(readableStream, {
+    return new Response(responseStream, {
+      status: 200,
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
+        "Content-Type":
+          "text/plain; charset=utf-8",
+        "Cache-Control":
+          "no-cache, no-transform",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {
-    console.error("Gemini route error:", error);
+    console.error("Gemini API route error:", error);
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unable to generate a response.";
 
     return Response.json(
       {
-        message: "Unable to generate a response.",
+        message: errorMessage,
       },
       {
         status: 500,
