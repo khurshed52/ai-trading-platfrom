@@ -1,6 +1,7 @@
 export const ROUTES = {
   PUBLIC: {
     DASHBOARD: "/dashboard",
+    MARKETS: "/markets",
   },
 
   AUTH: {

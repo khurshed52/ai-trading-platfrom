@@ -53,7 +53,7 @@ const primaryNavigation: MenuProps["items"] = [
   {
     key: "/markets",
     icon: <FundOutlined />,
-    label: <Link href="/markets">Markets</Link>,
+    label: <Link href={ROUTES.PUBLIC.MARKETS}>Markets</Link>,
   },
   {
     key: "/watchlist",

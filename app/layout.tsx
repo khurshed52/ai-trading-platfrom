@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import "react-international-phone/style.css";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import AntDesignProvider from "@/components/AntDesignProvider";
+import AntDesignProvider from "@/components/providers/AntDesignProvider";
+import QueryProvider from "@/components/providers/query-provider";
 import { Sora } from "next/font/google";
 import "./globals.css";
 
@@ -28,7 +29,9 @@ export default function RootLayout({
       <body className={`${sora.className} flex min-h-full flex-col`}>
         <AntdRegistry>
           <AntDesignProvider>
-            {children}
+              <QueryProvider>
+               {children}
+             </QueryProvider>
           </AntDesignProvider>
         </AntdRegistry>
       </body>

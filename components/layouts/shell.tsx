@@ -23,32 +23,37 @@ export default function DashboardShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <Layout className="min-h-screen !bg-[#f4f7fb]">
+    <Layout className="tradepro-dashboard-shell !min-h-screen !w-full !bg-[#f4f7fb]">
       <DashboardSidebar
         collapsed={collapsed}
         mobileMenuOpen={mobileMenuOpen}
-        onCloseMobileMenu={() => setMobileMenuOpen(false)}
+        onCloseMobileMenu={() => {
+          setMobileMenuOpen(false);
+        }}
       />
 
       <Layout
-        className="tradepro-dashboard-main !min-h-screen !bg-[#f4f7fb] transition-[margin-left] duration-200"
-        style={{
-          marginLeft: collapsed
-            ? COLLAPSED_WIDTH
-            : SIDEBAR_WIDTH,
-        }}
+        className={
+          collapsed
+            ? "tradepro-dashboard-main tradepro-dashboard-main-collapsed"
+            : "tradepro-dashboard-main"
+        }
       >
         <DashboardHeader
           collapsed={collapsed}
-          onToggleCollapsed={() =>
-            setCollapsed((current) => !current)
-          }
-          onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          onToggleCollapsed={() => {
+            setCollapsed((current) => !current);
+          }}
+          onOpenMobileMenu={() => {
+            setMobileMenuOpen(true);
+          }}
         />
 
-        <Content className="!min-h-[calc(100vh-76px)] !bg-[#f4f7fb]">
-          <main className="mx-auto w-full max-w-[1680px] p-4 sm:p-6 lg:p-7">
-            {children}
+        <Content className="!min-h-[calc(100vh-76px)] !min-w-0 !overflow-x-hidden !bg-[#f4f7fb]">
+          <main className="w-full min-w-0 p-4 sm:p-6 lg:p-7">
+            <div className="mx-auto w-full min-w-0 max-w-[1680px]">
+              {children}
+            </div>
           </main>
         </Content>
       </Layout>
