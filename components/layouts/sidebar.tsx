@@ -13,20 +13,14 @@ import {
 import type { MenuProps } from "antd";
 import {
   ApiOutlined,
-  AppstoreOutlined,
   BarChartOutlined,
+  DollarOutlined,
   FundOutlined,
   HomeOutlined,
-  KeyOutlined,
-  LineChartOutlined,
-  NotificationOutlined,
   PieChartOutlined,
-  SafetyCertificateOutlined,
-  SettingOutlined,
-  ShopOutlined,
   StarOutlined,
+  SwapOutlined,
   TransactionOutlined,
-  UserOutlined,
   WalletOutlined,
 } from "@ant-design/icons";
 import { TrendingUp } from "lucide-react";
@@ -44,46 +38,110 @@ type DashboardSidebarProps = {
   onCloseMobileMenu: () => void;
 };
 
+const navigationKeys = [
+  "/dashboard",
+  "/markets",
+  "/watchlist",
+  "/portfolio",
+  "/orders",
+  "/positions",
+  "/analytics",
+  "/funds/deposit",
+  "/funds/withdraw",
+  "/funds/transfer",
+];
+
 const primaryNavigation: MenuProps["items"] = [
   {
     key: "/dashboard",
     icon: <HomeOutlined />,
-    label: <Link href="/dashboard">Dashboard</Link>,
+    label: (
+      <Link href="/dashboard">
+        Dashboard
+      </Link>
+    ),
   },
   {
     key: "/markets",
     icon: <FundOutlined />,
-    label: <Link href={ROUTES.PUBLIC.MARKETS}>Markets</Link>,
+    label: (
+      <Link href={ROUTES.PUBLIC.MARKETS}>
+        Markets
+      </Link>
+    ),
   },
+    // Funds parent menu
   {
-    key: "/watchlist",
-    icon: <StarOutlined />,
-    label: <Link href="/watchlist">Watchlist</Link>,
+    key: "/funds",
+    icon: <WalletOutlined />,
+    label: "Funds",
+    children: [
+      {
+        key: "/funds/deposit",
+        icon: <DollarOutlined />,
+        label: (
+          <Link href={ROUTES.FUNDS.DEPOSIT}>
+            Deposit
+          </Link>
+        ),
+      },
+      {
+        key: "/funds/withdraw",
+        icon: <WalletOutlined />,
+        label: (
+          <Link href="/funds/withdraw">
+            Withdraw
+          </Link>
+        ),
+      },
+      {
+        key: "/funds/transfer",
+        icon: <SwapOutlined />,
+        label: (
+          <Link href="/funds/transfer">
+            Transfer
+          </Link>
+        ),
+      },
+    ],
   },
   {
     key: "/portfolio",
     icon: <PieChartOutlined />,
-    label: <Link href="/portfolio">Portfolio</Link>,
+    label: (
+      <Link href="/portfolio">
+        Portfolio
+      </Link>
+    ),
   },
   {
     key: "/orders",
     icon: <TransactionOutlined />,
-    label: <Link href="/orders">Orders</Link>,
+    label: (
+      <Link href="/orders">
+        Orders
+      </Link>
+    ),
   },
   {
     key: "/positions",
     icon: <BarChartOutlined />,
-    label: <Link href="/positions">Positions</Link>,
+    label: (
+      <Link href="/positions">
+        Positions
+      </Link>
+    ),
   },
   {
     key: "/analytics",
-    icon: <LineChartOutlined />,
-    label: <Link href="/analytics">Analytics</Link>,
+    icon: <FundOutlined />,
+    label: (
+      <Link href="/analytics">
+        Analytics
+      </Link>
+    ),
   },
-];
 
-const allNavigationItems = [
-  ...(primaryNavigation ?? []),
 ];
 
 export default function DashboardSidebar({
@@ -94,17 +152,11 @@ export default function DashboardSidebar({
   const pathname = usePathname();
 
   const selectedKey = useMemo(() => {
-    const matchedKey = allNavigationItems
-      .filter(
-        (
-          item,
-        ): item is Exclude<
-          NonNullable<MenuProps["items"]>[number],
-          null
-        > => Boolean(item && "key" in item),
+    const matchedKey = [...navigationKeys]
+      .sort(
+        (first, second) =>
+          second.length - first.length,
       )
-      .map((item) => String(item.key))
-      .sort((first, second) => second.length - first.length)
       .find(
         (key) =>
           pathname === key ||
@@ -116,15 +168,18 @@ export default function DashboardSidebar({
 
   return (
     <>
+      {/* Desktop sidebar */}
       <Sider
         width={SIDEBAR_WIDTH}
         collapsedWidth={COLLAPSED_WIDTH}
         collapsed={collapsed}
         trigger={null}
         theme="dark"
-        className="!fixed !inset-y-0 !left-0 !z-50 !hidden !overflow-hidden !bg-[#06152f] lg:!block"
+        className="!fixed !inset-y-0 !left-0 !z-50 !hidden !overflow-hidden !bg-[#06152f] !transition-none lg:!block"
         style={{
-          boxShadow: "10px 0 35px rgba(15, 23, 42, 0.12)",
+          boxShadow:
+            "10px 0 35px rgba(15, 23, 42, 0.12)",
+          transition: "none",
         }}
       >
         <SidebarContent
@@ -134,6 +189,7 @@ export default function DashboardSidebar({
         />
       </Sider>
 
+      {/* Mobile sidebar */}
       <Drawer
         open={mobileMenuOpen}
         onClose={onCloseMobileMenu}
@@ -168,8 +224,12 @@ function SidebarContent({
   selectedKey,
   onNavigate,
 }: SidebarContentProps) {
+  const fundsMenuIsActive =
+    selectedKey.startsWith("/funds/");
+
   return (
     <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.15),transparent_30%),linear-gradient(180deg,#06152f_0%,#071a38_100%)]">
+      {/* Brand */}
       <div
         className={`flex h-[76px] shrink-0 items-center border-b border-white/10 ${
           collapsed
@@ -183,7 +243,10 @@ function SidebarContent({
           className="flex items-center gap-3"
         >
           <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-[0_10px_25px_rgba(37,99,235,0.4)]">
-            <TrendingUp size={23} strokeWidth={2.5} />
+            <TrendingUp
+              size={23}
+              strokeWidth={2.5}
+            />
           </div>
 
           {!collapsed && (
@@ -203,6 +266,7 @@ function SidebarContent({
         </Link>
       </div>
 
+      {/* Navigation */}
       <div className="tradepro-sidebar-scrollbar min-h-0 flex-1 overflow-y-auto py-5">
         <SidebarSectionTitle
           collapsed={collapsed}
@@ -214,26 +278,18 @@ function SidebarContent({
           theme="dark"
           inlineCollapsed={collapsed}
           selectedKeys={[selectedKey]}
+          defaultOpenKeys={
+            fundsMenuIsActive
+              ? ["/funds"]
+              : []
+          }
           items={primaryNavigation}
           onClick={onNavigate}
           className="tradepro-sidebar-menu"
         />
-
-        <SidebarDivider />
-
-        <SidebarSectionTitle
-          collapsed={collapsed}
-          title="Wallet"
-        />
-
-        <SidebarDivider />
-
-        <SidebarSectionTitle
-          collapsed={collapsed}
-          title="Account"
-        />
       </div>
 
+      {/* Upgrade card */}
       {!collapsed && (
         <div className="shrink-0 p-4">
           <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-xl backdrop-blur">
@@ -248,7 +304,8 @@ function SidebarContent({
                 </p>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-400">
-                  Unlock advanced analytics and lower fees.
+                  Unlock advanced analytics and
+                  lower fees.
                 </p>
               </div>
             </div>
@@ -282,11 +339,5 @@ function SidebarSectionTitle({
     <p className="mb-2 mt-1 px-6 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
       {title}
     </p>
-  );
-}
-
-function SidebarDivider() {
-  return (
-    <div className="mx-5 my-4 h-px bg-white/10" />
   );
 }

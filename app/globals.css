@@ -296,3 +296,39 @@ body {
     margin-left: 0;
   }
 }
+
+.deposit-account-select .ant-select-selector {
+  min-height: 72px !important;
+  padding: 8px 14px !important;
+  border-radius: 12px !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: none !important;
+}
+
+.deposit-account-select.ant-select-focused
+  .ant-select-selector {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%) !important;
+}
+
+.deposit-account-select
+  .ant-select-selection-item {
+  display: flex !important;
+  align-items: center !important;
+  padding-inline-end: 28px !important;
+}
+
+.deposit-account-select
+  .ant-select-arrow {
+  color: #334155;
+}
+
+.ant-input-number {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+}
+
+.ant-input-number-input-wrap {
+  width: 100%;
+}

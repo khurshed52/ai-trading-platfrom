@@ -9,4 +9,10 @@ export const ROUTES = {
     REGISTER: "/register",
     FORGOT_PASSWORD: "/forgot-password",
   },
+
+    FUNDS: {
+     DEPOSIT: "/funds/deposit",
+      WITHDRAW: "/funds/withdraw",
+      TRANSFER: "/funds/transfer",
+    }
 } as const;

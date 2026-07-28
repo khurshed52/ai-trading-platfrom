@@ -14,3 +14,9 @@ export type RegisterFormValues = {
   password: string;
   consent: boolean;
 };
+
+export type ButtonProps = {
+  children: React.ReactNode;
+  onClick: ()=> void;
+  variant?: "primary" | "secondary" | "danger";
+}

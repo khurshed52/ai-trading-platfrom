@@ -4,31 +4,74 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/**
- * Start with forex and crypto symbols supported by the free plan.
- * Add metals later after confirming your Twelve Data plan supports them.
- */
-const symbols = [
+const instruments = [
   {
     symbol: "XAU/USD",
     name: "Gold",
+    spreadPoints: 22,
+    pointSize: 0.01,
+    priceDecimals: 2,
   },
   {
     symbol: "BTC/USD",
     name: "Bitcoin",
+    spreadPoints: 19,
+    pointSize: 1,
+    priceDecimals: 2,
   },
   {
     symbol: "ETH/USD",
     name: "Ethereum",
+    spreadPoints: 9,
+    pointSize: 0.1,
+    priceDecimals: 1,
   },
   {
     symbol: "EUR/USD",
     name: "Euro / US Dollar",
+    spreadPoints: 16,
+    pointSize: 0.00001,
+    priceDecimals: 5,
   },
   {
     symbol: "EUR/JPY",
     name: "Euro / Japanese Yen",
+    spreadPoints: 19,
+    pointSize: 0.001,
+    priceDecimals: 3,
   },
+
+  // Add these only if your plan supports them.
+  // Every symbol consumes additional Twelve Data credits.
+
+  // {
+  //   symbol: "XAG/USD",
+  //   name: "Silver",
+  //   spreadPoints: 32,
+  //   pointSize: 0.001,
+  //   priceDecimals: 3,
+  // },
+  // {
+  //   symbol: "USD/JPY",
+  //   name: "US Dollar / Japanese Yen",
+  //   spreadPoints: 19,
+  //   pointSize: 0.001,
+  //   priceDecimals: 3,
+  // },
+  // {
+  //   symbol: "EUR/NZD",
+  //   name: "Euro / New Zealand Dollar",
+  //   spreadPoints: 36,
+  //   pointSize: 0.00001,
+  //   priceDecimals: 5,
+  // },
+  // {
+  //   symbol: "USD/CAD",
+  //   name: "US Dollar / Canadian Dollar",
+  //   spreadPoints: 20,
+  //   pointSize: 0.00001,
+  //   priceDecimals: 5,
+  // },
 ] as const;
 
 type TwelveDataTimeSeriesValue = {
@@ -59,10 +102,21 @@ type MarketResult = {
   symbol: string;
   displaySymbol: string;
   name: string;
+
+  // Mid/latest market price from Twelve Data.
   price: number;
+
+  // Demo bid/ask presentation values.
+  buyPrice: number;
+  sellPrice: number;
+  spread: number;
+  spreadValue: number;
+
   previousPrice: number;
   change: number;
   percentageChange: number;
+  priceDecimals: number;
+
   chart: number[];
   chartPoints: Array<{
     datetime: string;
@@ -74,6 +128,13 @@ type FailedMarket = {
   symbol: string;
   message: string;
 };
+
+function roundPrice(
+  value: number,
+  decimals: number,
+): number {
+  return Number(value.toFixed(decimals));
+}
 
 export async function GET() {
   const apiKey = process.env.TWELVE_DATA_API_KEY;
@@ -90,106 +151,144 @@ export async function GET() {
   }
 
   const settledResults = await Promise.allSettled(
-    symbols.map(async ({ symbol, name }): Promise<MarketResult> => {
-      const params = new URLSearchParams({
+    instruments.map(
+      async ({
         symbol,
-        interval: "1h",
-        outputsize: "24",
-
-        // Must be lowercase.
-        order: "asc",
-
-        apikey: apiKey,
-      });
-
-      const response = await fetch(
-        `https://api.twelvedata.com/time_series?${params.toString()}`,
-        {
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
-          },
-        },
-      );
-
-      /*
-       * Parse the response before checking response.ok so the actual
-       * Twelve Data error message can be returned.
-       */
-      const responseData =
-        (await response.json()) as TwelveDataTimeSeriesResponse;
-
-      if (!response.ok || responseData.status === "error") {
-        console.error("Twelve Data request failed:", {
+        name,
+        spreadPoints,
+        pointSize,
+        priceDecimals,
+      }): Promise<MarketResult> => {
+        const params = new URLSearchParams({
           symbol,
-          status: response.status,
-          code: responseData.code,
-          message: responseData.message,
+          interval: "1h",
+          outputsize: "24",
+          order: "asc",
+          apikey: apiKey,
         });
 
-        throw new Error(
-          responseData.message ||
-            `Twelve Data returned HTTP ${response.status} for ${symbol}.`,
+        const response = await fetch(
+          `https://api.twelvedata.com/time_series?${params.toString()}`,
+          {
+            cache: "no-store",
+            headers: {
+              Accept: "application/json",
+            },
+          },
         );
-      }
 
-      if (!responseData.values?.length) {
-        throw new Error(`No market data was returned for ${symbol}.`);
-      }
+        const responseData =
+          (await response.json()) as TwelveDataTimeSeriesResponse;
 
-      /*
-       * Since order=asc, the oldest value is first and newest is last.
-       */
-      const values = responseData.values;
+        if (
+          !response.ok ||
+          responseData.status === "error"
+        ) {
+          throw new Error(
+            responseData.message ||
+              `Twelve Data returned HTTP ${response.status} for ${symbol}.`,
+          );
+        }
 
-      const firstPrice = Number(values[0].close);
-      const currentPrice = Number(values[values.length - 1].close);
+        if (!responseData.values?.length) {
+          throw new Error(
+            `No market data was returned for ${symbol}.`,
+          );
+        }
 
-      if (
-        !Number.isFinite(firstPrice) ||
-        !Number.isFinite(currentPrice)
-      ) {
-        throw new Error(`Invalid price data was returned for ${symbol}.`);
-      }
+        const values = responseData.values;
 
-      const change = currentPrice - firstPrice;
+        // order=asc: first is oldest, last is newest.
+        const previousPrice = Number(values[0].close);
+        const currentPrice = Number(
+          values[values.length - 1].close,
+        );
 
-      const percentageChange =
-        firstPrice !== 0 ? (change / firstPrice) * 100 : 0;
+        if (
+          !Number.isFinite(previousPrice) ||
+          !Number.isFinite(currentPrice)
+        ) {
+          throw new Error(
+            `Invalid price data was returned for ${symbol}.`,
+          );
+        }
 
-      const chartPoints = values
-        .map((value) => ({
-          datetime: value.datetime,
-          value: Number(value.close),
-        }))
-        .filter((point) => Number.isFinite(point.value));
+        const spreadValue =
+          spreadPoints * pointSize;
 
-      return {
-        symbol,
-        displaySymbol: symbol.replace("/", ""),
-        name,
-        price: currentPrice,
-        previousPrice: firstPrice,
-        change,
-        percentageChange,
-        chart: chartPoints.map((point) => point.value),
-        chartPoints,
-      };
-    }),
+        const halfSpread = spreadValue / 2;
+
+        // Buy is ask; sell is bid.
+        const buyPrice = roundPrice(
+          currentPrice + halfSpread,
+          priceDecimals,
+        );
+
+        const sellPrice = roundPrice(
+          currentPrice - halfSpread,
+          priceDecimals,
+        );
+
+        const change =
+          currentPrice - previousPrice;
+
+        const percentageChange =
+          previousPrice !== 0
+            ? (change / previousPrice) * 100
+            : 0;
+
+        const chartPoints = values
+          .map((item) => ({
+            datetime: item.datetime,
+            value: Number(item.close),
+          }))
+          .filter((item) =>
+            Number.isFinite(item.value),
+          );
+
+        return {
+          symbol,
+          displaySymbol: symbol.replace("/", ""),
+          name,
+
+          price: roundPrice(
+            currentPrice,
+            priceDecimals,
+          ),
+
+          buyPrice,
+          sellPrice,
+          spread: spreadPoints,
+          spreadValue,
+          previousPrice: roundPrice(
+            previousPrice,
+            priceDecimals,
+          ),
+          change,
+          percentageChange,
+          priceDecimals,
+
+          chart: chartPoints.map(
+            (item) => item.value,
+          ),
+          chartPoints,
+        };
+      },
+    ),
   );
 
   const data: MarketResult[] = [];
-  const failed: FailedMarket[] = [];
+  const errors: FailedMarket[] = [];
 
   settledResults.forEach((result, index) => {
-    const symbol = symbols[index].symbol;
+    const symbol = instruments[index].symbol;
 
     if (result.status === "fulfilled") {
       data.push(result.value);
       return;
     }
 
-    failed.push({
+    errors.push({
       symbol,
       message:
         result.reason instanceof Error
@@ -198,16 +297,13 @@ export async function GET() {
     });
   });
 
-  /*
-   * Only fail the whole request when every market request failed.
-   */
   if (data.length === 0) {
     return NextResponse.json(
       {
         message:
-          failed[0]?.message ||
+          errors[0]?.message ||
           "Twelve Data did not return any market data.",
-        errors: failed,
+        errors,
       },
       {
         status: 502,
@@ -218,16 +314,14 @@ export async function GET() {
   return NextResponse.json(
     {
       data,
-      errors: failed,
+      errors,
+      spreadType: "estimated",
       updatedAt: new Date().toISOString(),
     },
     {
       headers: {
-        /*
-         * Avoid making another provider request for one minute.
-         * The browser query should also poll much less frequently.
-         */
-        "Cache-Control": "private, max-age=60",
+        "Cache-Control":
+          "private, max-age=60, stale-while-revalidate=30",
       },
     },
   );
