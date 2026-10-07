@@ -1,0 +1,246 @@
+{
+  "metadata": {
+    "source": "TradePro controlled product knowledge",
+    "lastUpdated": "2026-09-03",
+    "maintenanceNote": "Edit this file when verified TradePro product information changes. Account terms currently marked temporary must be replaced and verified before production use."
+  },
+  "overview": {
+    "companyName": "TradePro",
+    "productName": "TradePro AI Trading Platform"
+  },
+  "accountTypes": {
+    "offered": [
+      {
+        "name": "Standard Account",
+        "minimumDeposit": {
+          "amount": 100,
+          "currency": "USD"
+        },
+        "maximumLeverage": "1:500",
+        "verificationStatus": "temporary"
+      },
+      {
+        "name": "Raw / ECN Account",
+        "minimumDeposit": {
+          "amount": 500,
+          "currency": "USD"
+        },
+        "maximumLeverage": "1:500",
+        "commission": {
+          "amount": 7,
+          "currency": "USD",
+          "calculation": "per round-turn lot"
+        },
+        "verificationStatus": "temporary"
+      },
+      {
+        "name": "VIP / Pro Account",
+        "minimumDeposit": {
+          "amount": 10000,
+          "currency": "USD"
+        },
+        "maximumLeverage": "1:200",
+        "verificationStatus": "temporary"
+      },
+      {
+        "name": "Islamic / Swap-Free Account",
+        "minimumDeposit": {
+          "amount": 100,
+          "currency": "USD"
+        },
+        "maximumLeverage": "1:500",
+        "verificationStatus": "temporary"
+      },
+      {
+        "name": "Demo Account",
+        "minimumDeposit": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "maximumLeverage": "1:500",
+        "fundType": "Virtual funds only",
+        "verificationStatus": "temporary"
+      }
+    ],
+    "notOffered": []
+  },
+  "registration": {
+    "facts": [
+      {
+        "topic": "registrationFlow",
+        "summary": "Create and verify an account, fund it, then sign in to MetaTrader 5 and start trading.",
+        "steps": [
+          {
+            "number": 1,
+            "title": "Create Your Account",
+            "description": "Register online in under 3 minutes and verify your identity with a government-issued ID.",
+            "requirements": [
+              "Full name and contact information",
+              "Passport or Emirates ID",
+              "Digital identity verification"
+            ]
+          },
+          {
+            "number": 2,
+            "title": "Fund Your Account",
+            "description": "Deposit using a preferred supported payment method.",
+            "methods": [
+              "Credit or debit card",
+              "Bank transfer",
+              "Digital payments"
+            ]
+          },
+          {
+            "number": 3,
+            "title": "Start Trading",
+            "description": "Download MetaTrader 5, sign in with your credentials, and start trading.",
+            "features": [
+              "MetaTrader 5 (MT5)",
+              "Desktop, iOS, and Android",
+              "Access to more than 70 forex pairs",
+              "24/5 dedicated support"
+            ]
+          }
+        ],
+        "verificationStatus": "provided"
+      }
+    ]
+  },
+  "deposits": {
+    "facts": [
+      {
+        "topic": "supportedMethods",
+        "value": [
+          "Credit or debit card",
+          "Bank transfer",
+          "Digital payments"
+        ],
+        "verificationStatus": "provided"
+      }
+    ]
+  },
+  "withdrawals": {
+    "verificationStatus": "temporary",
+    "facts": [
+      {
+        "topic": "processingTime",
+        "value": "1–3 business days",
+        "note": "The payment provider or receiving bank may require additional time."
+      },
+      {
+        "topic": "minimumWithdrawal",
+        "value": {
+          "amount": 50,
+          "currency": "USD"
+        }
+      },
+      {
+        "topic": "maximumWithdrawal",
+        "value": "Subject to account limits, available balance, and payment-provider limits."
+      },
+      {
+        "topic": "supportedMethods",
+        "value": [
+          "Bank transfer",
+          "Credit or debit card",
+          "Supported electronic wallets",
+          "Supported cryptocurrency networks"
+        ]
+      },
+      {
+        "topic": "fees",
+        "value": "TradePro may not charge an internal withdrawal fee, but banks, payment providers, blockchain networks, or currency conversion may add charges."
+      },
+      {
+        "topic": "identityVerification",
+        "value": "Identity and account verification must be completed before a withdrawal can be approved."
+      },
+      {
+        "topic": "originalPaymentMethod",
+        "value": "Withdrawals may be returned to the original deposit method where required by payment rules and anti-money-laundering controls."
+      },
+      {
+        "topic": "accountOwnership",
+        "value": "The withdrawal destination must generally be held in the verified account holder's name. Third-party withdrawals are not accepted."
+      },
+      {
+        "topic": "availableBalance",
+        "value": "A withdrawal cannot exceed the account's available withdrawable balance. Funds used as margin for open positions may not be available."
+      },
+      {
+        "topic": "openPositions",
+        "value": "A withdrawal request may be declined or reduced if completing it would cause insufficient margin for open positions."
+      },
+      {
+        "topic": "currencyConversion",
+        "value": "A currency conversion and provider exchange rate may apply when the withdrawal currency differs from the trading account or destination currency."
+      },
+      {
+        "topic": "weekendsAndHolidays",
+        "value": "Business-day processing excludes weekends and relevant bank or public holidays."
+      },
+      {
+        "topic": "pendingCancellation",
+        "value": "A pending request may be cancellable before processing begins. Processed withdrawals cannot normally be cancelled."
+      },
+      {
+        "topic": "possibleRejectionReasons",
+        "value": [
+          "Incomplete identity verification",
+          "Incorrect payment details",
+          "Destination ownership mismatch",
+          "Insufficient withdrawable balance",
+          "Insufficient free margin",
+          "Payment-provider restrictions",
+          "Compliance or security review"
+        ]
+      },
+      {
+        "topic": "securityReview",
+        "value": "TradePro may request additional documents or security confirmation before processing a withdrawal."
+      },
+      {
+        "topic": "tracking",
+        "value": "Withdrawal status should be checked from the account transaction or withdrawal history."
+      }
+    ]
+  },
+  "fees": {
+    "facts": []
+  },
+  "tradingPlatforms": {
+    "offered": [
+      {
+        "name": "MetaTrader 5",
+        "shortName": "MT5",
+        "devices": [
+          "Desktop",
+          "iOS",
+          "Android"
+        ],
+        "verificationStatus": "provided"
+      }
+    ],
+    "notOffered": [
+      {
+        "name": "cTrader",
+        "note": "TradePro does not provide the cTrader platform."
+      }
+    ]
+  },
+  "security": {
+    "facts": []
+  },
+  "support": {
+    "facts": [
+      {
+        "topic": "availability",
+        "value": "24/5 dedicated support",
+        "verificationStatus": "provided"
+      }
+    ]
+  },
+  "policies": {
+    "facts": []
+  }
+}

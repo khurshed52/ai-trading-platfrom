@@ -2,8 +2,9 @@
 
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { LoginFormValues } from "@/types/auth";
 import {
   AppleFilled,
@@ -16,7 +17,6 @@ import {
   Button,
   Card,
   Checkbox,
-  ConfigProvider,
   Divider,
   Form,
   Input,
@@ -24,8 +24,9 @@ import {
 } from "antd";
 
 import { ROUTES } from "@/constants/routes";
-
+import { useLogin } from "@/hooks/useAuth";
 const { Title, Text } = Typography;
+const REMEMBERED_EMAIL_KEY = "tradepro_remembered_email";
 
 function GoogleIcon() {
   return (
@@ -58,12 +59,52 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const [form] = Form.useForm<LoginFormValues>();
+  const { mutate, isPending } = useLogin();
+
+  useEffect(() => {
+    try {
+      const rememberedEmail = window.localStorage.getItem(
+        REMEMBERED_EMAIL_KEY,
+      );
+
+      if (rememberedEmail) {
+        form.setFieldsValue({
+          email: rememberedEmail,
+          remember: true,
+        });
+      }
+    } catch {
+      // The login form still works when browser storage is unavailable.
+    }
+  }, [form]);
 
   function handleSubmit(values: LoginFormValues) {
-    console.log("Form submitted with values:", values);
+     mutate(
+      {
+        email: values.email,
+        password: values.password,
+        rememberMe: values.remember,
+      },
+      {
+        onSuccess: () => {
+          try {
+            if (values.remember) {
+              window.localStorage.setItem(
+                REMEMBERED_EMAIL_KEY,
+                values.email,
+              );
+            } else {
+              window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+            }
+          } catch {
+            // Authentication should succeed even if storage is unavailable.
+          }
 
-    // Replace this with your login API request.
-    router.push(ROUTES.PUBLIC.DASHBOARD);
+          router.push(ROUTES.PUBLIC.DASHBOARD);
+        },
+      }
+    );
   }
 
   function handleGoogleLogin() {
@@ -89,7 +130,7 @@ export default function LoginPage() {
           },
         }}
       >
-        <div className="bg-white px-6 py-4 sm:px-8 sm:py-8 shadow-lg">
+        <div className="bg-white px-6 py-4 shadow-lg sm:px-8 sm:py-8">
           <header className="mb-8">
             <Title
               level={1}
@@ -104,12 +145,13 @@ export default function LoginPage() {
           </header>
 
           <Form<LoginFormValues>
+            form={form}
+            name="login"
+            autoComplete="on"
             layout="vertical"
             requiredMark={false}
             initialValues={{
-              email: "test@gmail.com",
-              password: "password",
-              remember: true,
+              remember: false,
             }}
             onFinish={handleSubmit}
           >
@@ -189,7 +231,7 @@ export default function LoginPage() {
                 block
                 className=""
               >
-                Sign In
+                 {isPending ? "Logging in..." : "Login"}
               </Button>
             </Form.Item>
           </Form>

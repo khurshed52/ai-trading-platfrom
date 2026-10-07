@@ -2,21 +2,117 @@
 
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Button, Card, Checkbox, Form, Input, Typography } from "antd";
+import { useRouter } from "next/navigation";
+import OtpInput from "react-otp-input";
+import { Alert, Button, Card, Checkbox, Form, Input, Typography } from "antd";
 import { ROUTES } from "@/constants/routes";
 import type { RegisterFormValues } from "@/types/auth";
 import PhoneNumberInput from "@/components/form/phone-number-input";
-
+import {
+  useRegister,
+  useResendRegistrationOtp,
+  useVerifyRegistrationOtp,
+} from "@/hooks/useAuth";
 const { Title, Text } = Typography;
 
 export default function RegisterPage() {
-const [form] = Form.useForm<RegisterFormValues>();
+  const [form] = Form.useForm<RegisterFormValues>();
+  const router = useRouter();
+  const [step, setStep] = useState<"details" | "otp">("details");
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpFeedback, setOtpFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const { mutate: register, isPending } = useRegister();
+  const verifyOtp = useVerifyRegistrationOtp();
+  const resendOtp = useResendRegistrationOtp();
 
   function handleSubmit(values: RegisterFormValues) {
-    console.log("Register form submitted:", values);
-    form.resetFields();
-    // Replace with your register API request.
+    register(
+      {
+        customerFirstName: values.firstName,
+        customerLastName: values.lastName,
+        email: values.email,
+        password: values.password,
+        customerNationality: values.phone.countryIso2.toUpperCase(),
+        phoneNumber: values.phone.fullPhone,
+        reglink: "some-reg-link",
+        consentAccepted: values.consent,
+      },
+      {
+        onSuccess: (data) => {
+          const responseEmail =
+            data.data?.email ??
+            data.data?.user?.email ??
+            data.data?.customer?.email ??
+            values.email;
+
+          setVerificationEmail(responseEmail);
+          setOtp("");
+          setOtpFeedback(null);
+          setStep("otp");
+        },
+      },
+    );
+  }
+
+  function handleVerifyOtp() {
+    if (otp.length !== 6 || !verificationEmail) {
+      setOtpFeedback({
+        type: "error",
+        message: "Enter the complete 6-digit verification code.",
+      });
+      return;
+    }
+
+    setOtpFeedback(null);
+    verifyOtp.mutate(
+      {
+        email: verificationEmail,
+        otp,
+      },
+      {
+        onSuccess: () => {
+          router.push(ROUTES.AUTH.LOGIN);
+        },
+        onError: (error) => {
+          setOtpFeedback({
+            type: "error",
+            message: error.message,
+          });
+        },
+      },
+    );
+  }
+
+  function handleResendOtp() {
+    if (!verificationEmail) {
+      return;
+    }
+
+    setOtpFeedback(null);
+    resendOtp.mutate(
+      { email: verificationEmail },
+      {
+        onSuccess: (data) => {
+          setOtp("");
+          setOtpFeedback({
+            type: "success",
+            message: data.message || "Verification code resent successfully.",
+          });
+        },
+        onError: (error) => {
+          setOtpFeedback({
+            type: "error",
+            message: error.message,
+          });
+        },
+      },
+    );
   }
 
   return (
@@ -40,20 +136,23 @@ const [form] = Form.useForm<RegisterFormValues>();
               level={1}
               className="!mb-2 !text-[30px] !font-bold !leading-tight !tracking-[-0.03em] !text-slate-950 sm:!text-[34px]"
             >
-              Trade with us
+              {step === "details" ? "Trade with us" : "Verify your email"}
             </Title>
 
             <Text className="!text-[15px] !text-slate-500 sm:!text-base">
-              Create an account and start trading
+              {step === "details"
+                ? "Create an account and start trading"
+                : `Enter the 6-digit code sent to ${verificationEmail}`}
             </Text>
           </header>
 
-          <Form<RegisterFormValues>
-            layout="vertical"
-            form={form}
-            requiredMark={false}
-            onFinish={handleSubmit}
-          >
+          {step === "details" ? (
+            <Form<RegisterFormValues>
+              layout="vertical"
+              form={form}
+              requiredMark={false}
+              onFinish={handleSubmit}
+            >
             <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
               <Form.Item
                 name="firstName"
@@ -105,19 +204,21 @@ const [form] = Form.useForm<RegisterFormValues>();
               />
             </Form.Item>
 
-             <Form.Item
+              <Form.Item
                 name="phone"
                 rules={[
-                {
-                    required: true,
-                    message: "Please enter your phone number",
-                },
+                  {
+                    validator: (_, phone) =>
+                      phone?.phoneNumber
+                        ? Promise.resolve()
+                        : Promise.reject(
+                            new Error("Please enter your phone number"),
+                          ),
+                  },
                 ]}
-             >
-                 <PhoneNumberInput />
-               
-      </Form.Item>
-
+              >
+                <PhoneNumberInput />
+              </Form.Item>
 
             <Form.Item
               name="password"
@@ -227,12 +328,80 @@ const [form] = Form.useForm<RegisterFormValues>();
               <Button
                 type="primary"
                 htmlType="submit"
+                loading={isPending}
                 block
               >
-                Next
+                {isPending ? "Please wait..." : "Next"}
               </Button>
             </Form.Item>
-          </Form>
+            </Form>
+          ) : (
+            <div>
+              <OtpInput
+                value={otp}
+                onChange={(value) => {
+                  setOtp(value.replace(/\D/g, "").slice(0, 6));
+                  setOtpFeedback(null);
+                }}
+                numInputs={6}
+                inputType="tel"
+                shouldAutoFocus
+                skipDefaultStyles
+                containerStyle="grid grid-cols-6 gap-2 sm:gap-3 mb-2"
+                renderInput={(inputProps) => (
+                  <input
+                    {...inputProps}
+                    className="h-12 min-w-0 rounded-xl border border-slate-200 bg-white text-center text-xl font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)] sm:h-14"
+                  />
+                )}
+              />
+
+              {otpFeedback ? (
+                <Alert
+                  className="mt-5"
+                  type={otpFeedback.type}
+                  message={otpFeedback.message}
+                  showIcon
+                />
+              ) : null}
+
+              <Button
+                type="primary"
+                block
+                className="!mt-6"
+                loading={verifyOtp.isPending}
+                disabled={otp.length !== 6}
+                onClick={handleVerifyOtp}
+              >
+                {verifyOtp.isPending ? "Verifying..." : "Verify & Continue"}
+              </Button>
+
+              <div className="mt-5 text-center text-sm text-slate-500">
+                Didn&apos;t receive the code?{" "}
+                <Button
+                  type="link"
+                  className="!h-auto !p-0 !font-semibold"
+                  loading={resendOtp.isPending}
+                  onClick={handleResendOtp}
+                >
+                  Resend OTP
+                </Button>
+              </div>
+
+              {/* <div className="mt-2 text-center">
+                <Button
+                  type="text"
+                  className="!text-slate-500"
+                  onClick={() => {
+                    setOtpFeedback(null);
+                    setStep("details");
+                  }}
+                >
+                  Change email
+                </Button>
+              </div> */}
+            </div>
+          )}
 
           <footer className="mt-7 text-center">
             <Text className="!text-sm !text-slate-500">

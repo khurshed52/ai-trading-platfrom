@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ROUTES } from "@/constants/routes";
+import { useLogout } from "@/hooks/useAuth";
 import {
   Avatar,
   Badge,
@@ -26,6 +27,10 @@ import {
 
 const { Header } = Layout;
 const { Text, Title } = Typography;
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { notifyAuthLogout } from "@/lib/auth-events";
+import { useUserDetail } from "@/hooks/useUser";
 
 type DashboardHeaderProps = {
   collapsed: boolean;
@@ -51,7 +56,7 @@ const profileMenu: MenuProps["items"] = [
     key: "logout",
     icon: <LogoutOutlined />,
     danger: true,
-    label: <Link href={ROUTES.AUTH.LOGIN}>Log out</Link>,
+    label: "Log out"
   },
 ];
 
@@ -60,13 +65,35 @@ export default function DashboardHeader({
   onToggleCollapsed,
   onOpenMobileMenu,
 }: DashboardHeaderProps) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { mutate: logout } = useLogout();
+  const { data: userData } = useUserDetail();
+  const user = userData?.data;
+  const firstName = user?.customer_FirstName?.trim();
+  const fullName = [
+    user?.customer_FirstName,
+    user?.customer_MiddleName,
+    user?.customer_LastName,
+  ]
+    .map((namePart) => namePart?.trim())
+    .filter(Boolean)
+    .join(" ");
+
   function handleProfileMenuClick({
     key,
   }: {
     key: string;
   }) {
     if (key === "logout") {
-      console.log("Log out");
+      logout(undefined, {
+        onSuccess: () => {
+          notifyAuthLogout();
+          queryClient.clear();
+          router.push(ROUTES.AUTH.LOGIN);
+          router.refresh();
+        },
+      });
     }
   }
 
@@ -109,7 +136,7 @@ export default function DashboardHeader({
             level={4}
             className="!mb-0 !truncate !text-[16px] !font-bold !text-slate-950 sm:!text-[18px]"
           >
-            Welcome back, Khurshed 👋
+            Welcome back{firstName ? `, ${firstName}` : ""} 👋
           </Title>
 
           <Text className="!hidden !text-xs !text-slate-500 sm:!block">
@@ -156,11 +183,11 @@ export default function DashboardHeader({
 
               <div className="hidden min-w-0 md:block">
                 <p className="m-0 max-w-[130px] truncate text-sm font-semibold text-slate-950">
-                  Khurshed Khan
+                  {fullName || "TradePro User"}
                 </p>
 
                 <p className="m-0 text-[11px] font-medium text-blue-600">
-                  Premium Account
+                  {user?.customer_Status || "Account"}
                 </p>
               </div>
 

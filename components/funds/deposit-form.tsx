@@ -11,6 +11,7 @@ import {
 } from "@ant-design/icons";
 import {
   Button,
+  App,
   Card,
   Col,
   Form,
@@ -25,10 +26,19 @@ import {
   Landmark,
   WalletCards,
 } from "lucide-react";
+import {
+  useBankTransferDeposit,
+  useCreditDebitDeposit,
+  useDepositExchangeRate,
+  useSkrillDeposit,
+  useUsdtDeposit,
+} from "@/hooks/useDeposit";
 
 const { Text, Title } = Typography;
+const DEPOSIT_PSP_URL = "https://www.khurshedkhan.dev/";
+const MINIMUM_ACCOUNT_DEPOSIT_USD = 10;
 
-type CurrencyCode = "USD" | "EUR";
+type CurrencyCode = "USD" | "EUR" | "INR";
 
 type DepositMethodId =
   | "bank-transfer"
@@ -138,22 +148,31 @@ const currencyOptions = [
     label: "EUR",
     value: "EUR",
   },
+   {
+    label: "INR",
+    value: "INR",
+  },
 ];
 
 function formatMoney(
   value: number,
   currency: CurrencyCode,
 ) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
+  const formattedValue = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+
+  return `${formattedValue} ${currency}`;
 }
 
 export default function DepositForm() {
   const [form] = Form.useForm<DepositFormValues>();
+  const { message } = App.useApp();
+  const bankTransferDeposit = useBankTransferDeposit();
+  const creditDebitDeposit = useCreditDebitDeposit();
+  const skrillDeposit = useSkrillDeposit();
+  const usdtDeposit = useUsdtDeposit();
 
   const [selectedMethod, setSelectedMethod] =
     useState<DepositMethodId>("bank-transfer");
@@ -165,6 +184,20 @@ export default function DepositForm() {
     useState<CurrencyCode>("USD");
 
   const [amount, setAmount] = useState(0);
+
+  const {
+    data: exchangeRateResponse,
+    isLoading: isExchangeRateLoading,
+    isError: isExchangeRateError,
+    error: exchangeRateError,
+  } = useDepositExchangeRate({
+    fromCurrency: "USD",
+    toCurrency: currency,
+    paymentMethod: 0,
+  });
+
+  const apiExchangeRate = exchangeRateResponse?.data;
+  const exchangeRate = apiExchangeRate === 0 ? 1 : apiExchangeRate;
 
   const selectedAccount = useMemo(
     () =>
@@ -190,22 +223,72 @@ export default function DepositForm() {
     amount - feeAmount,
     0,
   );
+  const convertedReceiveAmount =
+    exchangeRate !== undefined && exchangeRate > 0
+      ? receiveAmount / exchangeRate
+      : undefined;
 
   const handleSubmit: FormProps<DepositFormValues>["onFinish"] = (
     values,
   ) => {
-    const payload = {
-      ...values,
-      amount,
-      fee: feeAmount,
-      receiveAmount,
-      account: selectedAccount,
-      method: selectedDepositMethod,
+    if (convertedReceiveAmount === undefined) {
+      message.error("The exchange rate is not available yet.");
+      return;
+    }
+
+    if (convertedReceiveAmount < MINIMUM_ACCOUNT_DEPOSIT_USD) {
+      message.error("The account must receive at least 10.00 USD.");
+      return;
+    }
+
+    const depositPayload = {
+      deposiT_TO: 2 as const,
+      paymenT_DESTINATION: selectedAccount.accountNumber,
+      deposiT_AMOUNT: convertedReceiveAmount,
+      currency: values.currency,
+    };
+    const redirectToPsp = () => {
+      window.location.assign(DEPOSIT_PSP_URL);
     };
 
-    console.log("Deposit payload:", payload);
-
-    // Call your payment/deposit API here.
+    switch (values.paymentMethod) {
+      case "bank-transfer":
+        bankTransferDeposit.mutate(
+          {
+            ...depositPayload,
+            country: "India",
+          },
+          {
+            onSuccess: () => {
+              message.success("The bank transfer deposit was successful.");
+            },
+           // onSettled: redirectToPsp,
+          },
+        );
+        break;
+      case "card":
+        creditDebitDeposit.mutate(depositPayload, {
+          onSuccess: redirectToPsp,
+        }, 
+      );
+        break;
+      case "skrill":
+        skrillDeposit.mutate(depositPayload, {
+          onSuccess: redirectToPsp,
+        });
+        break;
+      case "usdt":
+        usdtDeposit.mutate({
+          ...depositPayload,
+          coinName: "USDT",
+        }, {
+          onSuccess: redirectToPsp,
+        });
+        break;
+      case "bitcoin":
+        message.info("The Bitcoin deposit API is not configured yet.");
+        break;
+    }
   };
 
   return (
@@ -222,7 +305,7 @@ export default function DepositForm() {
       onFinish={handleSubmit}
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="space-y-4">
+        <div className="flex flex-col gap-2">
           <DepositMethodSection
             selectedMethod={selectedMethod}
             onChange={(method) => {
@@ -237,7 +320,6 @@ export default function DepositForm() {
 
           <TradingAccountSection
             selectedAccountId={selectedAccountId}
-            selectedAccount={selectedAccount}
             onChange={(accountId) => {
               const account =
                 tradingAccounts.find(
@@ -266,6 +348,16 @@ export default function DepositForm() {
           <DepositAmountSection
             currency={currency}
             amount={amount}
+            feePercentage={selectedDepositMethod.feePercentage}
+            receiveAmount={receiveAmount}
+            convertedReceiveAmount={convertedReceiveAmount}
+            exchangeRate={exchangeRate}
+            isExchangeRateLoading={isExchangeRateLoading}
+            exchangeRateError={
+              isExchangeRateError
+                ? exchangeRateError.message
+                : undefined
+            }
             onCurrencyChange={(nextCurrency) => {
               setCurrency(nextCurrency);
 
@@ -289,6 +381,12 @@ export default function DepositForm() {
             htmlType="submit"
             block
             icon={<LockOutlined />}
+            loading={
+              bankTransferDeposit.isPending ||
+              creditDebitDeposit.isPending ||
+              skrillDeposit.isPending ||
+              usdtDeposit.isPending
+            }
             className="!h-14 !rounded-xl !text-base !font-semibold"
           >
             Add Balance
@@ -300,7 +398,7 @@ export default function DepositForm() {
           method={selectedDepositMethod}
           amount={amount}
           fee={feeAmount}
-          receiveAmount={receiveAmount}
+          convertedReceiveAmount={convertedReceiveAmount}
           currency={currency}
         />
       </div>
@@ -320,10 +418,10 @@ function DepositMethodSection({
   return (
     <Card
       bordered={false}
-      className="!rounded-2xl !border !border-slate-200 !bg-white"
+      className="!rounded-2xl !border-0 !bg-white !shadow-[0_1px_4px_rgba(76,29,149,0.04)]"
       styles={{
         body: {
-          padding: 20,
+          padding: 10,
         },
       }}
     >
@@ -340,7 +438,7 @@ function DepositMethodSection({
             message: "Please select a deposit method",
           },
         ]}
-        className="!mb-0 !mt-4"
+        className="!mb-0 !mt-2"
       >
         <Radio.Group
           value={selectedMethod}
@@ -418,22 +516,20 @@ function DepositMethodSection({
 
 type TradingAccountSectionProps = {
   selectedAccountId: string;
-  selectedAccount: TradingAccount;
   onChange: (accountId: string) => void;
 };
 
 function TradingAccountSection({
   selectedAccountId,
-  selectedAccount,
   onChange,
 }: TradingAccountSectionProps) {
   return (
     <Card
       bordered={false}
-      className="!rounded-2xl !border !border-slate-200 !bg-white shadow-[0_12px_40px_rgba(15,23,42,0.05)]"
+      className="!rounded-2xl !border-0 !bg-white !shadow-[0_1px_4px_rgba(76,29,149,0.04)]"
       styles={{
         body: {
-          padding: 20,
+          padding: 10,
         },
       }}
     >
@@ -451,74 +547,32 @@ function TradingAccountSection({
               "Please select a trading account",
           },
         ]}
-        className="!mb-0 !mt-5"
+        className="!mb-0 !mt-2"
       >
         <Select
           value={selectedAccountId}
           onChange={onChange}
           suffixIcon={<DownOutlined />}
-          className="deposit-account-select !h-auto !w-full"
-          optionLabelProp="label"
-          options={tradingAccounts.map(
-            (account) => ({
-              value: account.id,
-              label: (
-                <AccountSelectValue
-                  account={account}
-                />
-              ),
-              searchLabel: `${account.label} ${account.accountNumber}`,
-            }),
-          )}
-          optionRender={(option) => {
-            const account =
-              tradingAccounts.find(
-                (item) =>
-                  item.id === option.value,
-              );
-
-            if (!account) {
-              return null;
-            }
-
-            return (
-              <div className="py-1">
-                <AccountSelectValue
-                  account={account}
-                />
-              </div>
-            );
-          }}
+          className="funds-control-select !w-full"
+          options={tradingAccounts.map((account) => ({
+            value: account.id,
+            label: `${account.label} · ${account.accountNumber} · ${account.currency}`,
+          }))}
         />
       </Form.Item>
     </Card>
   );
 }
 
-function AccountSelectValue({
-  account,
-}: {
-  account: TradingAccount;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-3 py-1">
-      <div className="min-w-0">
-        <p className="m-0 truncate text-sm font-semibold text-slate-950">
-          {account.label}
-        </p>
-
-        <p className="m-0 mt-0.5 text-xs text-slate-500">
-          {account.accountNumber} ·{" "}
-          {account.currency}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 type DepositAmountSectionProps = {
   currency: CurrencyCode;
   amount: number;
+  feePercentage: number;
+  receiveAmount: number;
+  convertedReceiveAmount?: number;
+  exchangeRate?: number;
+  isExchangeRateLoading: boolean;
+  exchangeRateError?: string;
   onCurrencyChange: (
     currency: CurrencyCode,
   ) => void;
@@ -528,16 +582,22 @@ type DepositAmountSectionProps = {
 function DepositAmountSection({
   currency,
   amount,
+  feePercentage,
+  receiveAmount,
+  convertedReceiveAmount,
+  exchangeRate,
+  isExchangeRateLoading,
+  exchangeRateError,
   onCurrencyChange,
   onAmountChange,
 }: DepositAmountSectionProps) {
   return (
     <Card
       bordered={false}
-      className="!rounded-2xl !border !border-slate-200 !bg-white shadow-[0_12px_40px_rgba(15,23,42,0.05)]"
+      className="!rounded-2xl !border-0 !bg-white !shadow-[0_1px_4px_rgba(76,29,149,0.04)]"
       styles={{
         body: {
-          padding: 20,
+          padding: "6px 10px",
         },
       }}
     >
@@ -546,7 +606,7 @@ function DepositAmountSection({
         title="Enter Deposit Amount"
       />
 
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-1 flex flex-col gap-3 sm:flex-row">
         <Form.Item
           name="currency"
           className="!mb-0 sm:!w-[130px]"
@@ -555,7 +615,7 @@ function DepositAmountSection({
             value={currency}
             options={currencyOptions}
             onChange={onCurrencyChange}
-            className="!h-14 !w-full"
+            className="funds-control-select !w-full"
           />
         </Form.Item>
 
@@ -570,16 +630,31 @@ function DepositAmountSection({
             },
             {
               validator: (_, value) => {
+                if (typeof value !== "number" || value <= 0) {
+                  return Promise.resolve();
+                }
+
+                const amountAfterFees =
+                  value * (1 - feePercentage / 100);
+                const accountReceiveAmount =
+                  exchangeRate !== undefined && exchangeRate > 0
+                    ? amountAfterFees / exchangeRate
+                    : undefined;
+
                 if (
-                  typeof value === "number" &&
-                  value >= 10
+                  accountReceiveAmount === undefined ||
+                  accountReceiveAmount >= MINIMUM_ACCOUNT_DEPOSIT_USD
                 ) {
                   return Promise.resolve();
                 }
 
+                const minimumPaymentAmount =
+                  (MINIMUM_ACCOUNT_DEPOSIT_USD * (exchangeRate ?? 1)) /
+                  (1 - feePercentage / 100);
+
                 return Promise.reject(
                   new Error(
-                    "Minimum deposit amount is 10",
+                    `Enter at least ${formatMoney(minimumPaymentAmount, currency)} so the account receives 10.00 USD`,
                   ),
                 );
               },
@@ -599,16 +674,77 @@ function DepositAmountSection({
                   : 0,
               )
             }
-            className="!h-14 !w-full"
+            className="funds-amount-input !w-full"
             styles={{
               input: {
-                height: 54,
                 fontSize: 18,
                 fontWeight: 600,
               },
             }}
           />
         </Form.Item>
+      </div>
+
+      <div className="mt-3 rounded-xl bg-gradient-to-r from-violet-50 via-white to-blue-50 px-4 py-3 shadow-[0_1px_4px_rgba(76,29,149,0.04)]">
+        <div className="grid gap-4 sm:grid-cols-3 sm:items-center">
+          <div>
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              You pay
+            </p>
+            <p className="m-0 mt-1 text-base font-bold text-slate-950">
+              {formatMoney(receiveAmount, currency)}
+            </p>
+          </div>
+
+          <div className="sm:text-center">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Exchange rate
+            </p>
+            <div className="mt-1 text-sm font-bold text-violet-700">
+              {isExchangeRateLoading && "Loading..."}
+              {exchangeRateError && (
+                <Text type="danger" className="!text-xs">
+                  Rate unavailable
+                </Text>
+              )}
+              {!isExchangeRateLoading &&
+                !exchangeRateError &&
+                exchangeRate !== undefined && (
+                  <span>
+                    1 USD ={" "}
+                    {exchangeRate.toLocaleString("en-US", {
+                      maximumFractionDigits: 8,
+                    })} {currency}
+                  </span>
+                )}
+            </div>
+          </div>
+
+          <div className="sm:text-right">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Account receives
+            </p>
+            <p
+              className={`m-0 mt-1 text-lg font-bold ${
+                amount > 0 &&
+                convertedReceiveAmount !== undefined &&
+                convertedReceiveAmount < MINIMUM_ACCOUNT_DEPOSIT_USD
+                  ? "text-red-600"
+                  : "text-emerald-600"
+              }`}
+            >
+              {formatMoney(convertedReceiveAmount ?? 0, "USD")}
+            </p>
+          </div>
+        </div>
+
+        {amount > 0 &&
+          convertedReceiveAmount !== undefined &&
+          convertedReceiveAmount < MINIMUM_ACCOUNT_DEPOSIT_USD && (
+            <p className="m-0 mt-2 border-t border-red-100 pt-2 text-xs font-medium text-red-600">
+              Minimum account deposit is 10.00 USD.
+            </p>
+          )}
       </div>
     </Card>
   );
@@ -619,7 +755,7 @@ type DepositSummaryProps = {
   method: DepositMethod;
   amount: number;
   fee: number;
-  receiveAmount: number;
+  convertedReceiveAmount?: number;
   currency: CurrencyCode;
 };
 
@@ -628,11 +764,11 @@ function DepositSummary({
   method,
   amount,
   fee,
-  receiveAmount,
+  convertedReceiveAmount,
   currency,
 }: DepositSummaryProps) {
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-2">
       <Card
         bordered={false}
         className="overflow-hidden !rounded-2xl !border-0 !bg-[linear-gradient(145deg,#071a38_0%,#06152f_55%,#0b2f68_100%)] shadow-[0_20px_60px_rgba(6,21,47,0.22)]"
@@ -699,8 +835,8 @@ function DepositSummary({
             value={
               <span className="text-lg font-bold text-emerald-400">
                 {formatMoney(
-                  receiveAmount,
-                  currency,
+                  convertedReceiveAmount ?? 0,
+                  "USD",
                 )}
               </span>
             }
@@ -710,12 +846,12 @@ function DepositSummary({
 
       </Card>
 
-      <Card
+      {/* <Card
         bordered={false}
         className="!rounded-2xl !border !border-emerald-100 !bg-emerald-50/70"
         styles={{
           body: {
-            padding: 20,
+            padding: 10,
           },
         }}
       >
@@ -736,19 +872,7 @@ function DepositSummary({
             </p>
           </div>
         </div>
-      </Card>
-
-      <Card
-        bordered={false}
-        className="!rounded-2xl !border !border-violet-100 !bg-violet-50/60"
-        styles={{
-          body: {
-            padding: 20,
-          },
-        }}
-      >
-
-      </Card>
+      </Card> */}
     </div>
   );
 }

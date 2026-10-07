@@ -3,10 +3,9 @@
 "use client";
 
 import Link from "next/link";
+import type { UserDetail } from "@/services/user.services";
 import {
-  ArrowDownOutlined,
   ArrowRightOutlined,
-  ArrowUpOutlined,
   BellOutlined,
   CheckCircleFilled,
   ClockCircleOutlined,
@@ -20,8 +19,6 @@ import {
   Typography,
 } from "antd";
 import {
-  Area,
-  AreaChart,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -38,12 +35,12 @@ import {
 } from "lucide-react";
 
 const { Title, Text } = Typography;
+import { useUserDetail, useTradingSummary } from "@/hooks/useUser";
 
 type SummaryItem = {
   title: string;
   value: string;
   suffix?: string;
-  percentage: number;
   chart: number[];
   icon: React.ReactNode;
   iconClassName: string;
@@ -74,9 +71,7 @@ type MarketItem = {
 const summaryItems: SummaryItem[] = [
   {
     title: "Trading Balance",
-    value: "5,680.48",
-    suffix: "USD",
-    percentage: 4.35,
+    value: "--",
     chart: [18, 20, 19, 23, 25, 21, 20, 24, 26, 30, 28, 33],
     icon: <WalletCards size={22} />,
     iconClassName:
@@ -85,8 +80,7 @@ const summaryItems: SummaryItem[] = [
   },
   {
     title: "Total Lots",
-    value: "102.75",
-    percentage: 2.15,
+    value: "--",
     chart: [18, 19, 18, 22, 20, 17, 18, 24, 20, 25, 30, 27],
     icon: <BarChart3 size={22} />,
     iconClassName:
@@ -95,8 +89,7 @@ const summaryItems: SummaryItem[] = [
   },
   {
     title: "Open Positions",
-    value: "4,989",
-    percentage: -1.35,
+    value: "--",
     chart: [18, 20, 17, 22, 19, 17, 20, 26, 18, 16, 22, 20],
     icon: <BriefcaseBusiness size={22} />,
     iconClassName:
@@ -105,9 +98,7 @@ const summaryItems: SummaryItem[] = [
   },
   {
     title: "Profit",
-    value: "-26,994.09",
-    suffix: "USD",
-    percentage: -3.25,
+    value: "--",
     chart: [16, 21, 18, 23, 17, 22, 29, 20, 14, 17, 22, 24],
     icon: <CircleDollarSign size={22} />,
     iconClassName:
@@ -116,8 +107,7 @@ const summaryItems: SummaryItem[] = [
   },
   {
     title: "Swaps",
-    value: "-5,046.7",
-    percentage: 0.75,
+    value: "--",
     chart: [15, 17, 14, 18, 16, 22, 15, 18, 17, 21, 16, 25],
     icon: <RefreshCw size={22} />,
     iconClassName:
@@ -210,12 +200,38 @@ const marketItems: MarketItem[] = [
 ];
 
 export default function DashboardPage() {
+  const { data: userData } = useUserDetail();
+  const { data: tradingData } = useTradingSummary();
+  const user = userData?.data;
+  const tradingSummary = tradingData?.data;
+
+  const summaryValues = tradingSummary
+    ? [
+        tradingSummary.amount,
+        tradingSummary.total_Lot,
+        tradingSummary.total_OpenPosition,
+        tradingSummary.total_Profit,
+        tradingSummary.total_Swap,
+      ]
+    : undefined;
+
+  const dashboardSummaryItems = summaryItems.map((item, index) => ({
+    ...item,
+    value:
+      summaryValues?.[index] === undefined
+        ? "--"
+        : summaryValues[index].toLocaleString(),
+    suffix:
+      index === 0 || index === 3
+        ? tradingSummary?.currency
+        : undefined,
+  }));
+
   return (
     <div className="space-y-5">
-      <ProfileHero />
-
+      <ProfileHero user={user} />
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {summaryItems.map((item) => (
+        {dashboardSummaryItems.map((item) => (
           <TradingSummaryCard
             key={item.title}
             item={item}
@@ -231,7 +247,11 @@ export default function DashboardPage() {
   );
 }
 
-function ProfileHero() {
+type ProfileHeroProps = {
+  user?: UserDetail;
+};
+
+function ProfileHero({ user }: ProfileHeroProps) {
   return (
     <section className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 p-2 shadow-[0_24px_60px_rgba(37,99,235,0.22)] sm:p-7">
       <HeroDecoration />
@@ -256,19 +276,19 @@ function ProfileHero() {
                 level={2}
                 className="!mb-0 !text-2xl !font-bold !text-white sm:!text-3xl"
               >
-                Khurshed Khan
+                {user?.customer?.customerFirstName} {user?.customer?.customerLastName}
               </Title>
 
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur">
                 <CheckCircleFilled />
-                Verified
+                {user?.status}
               </span>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-blue-100">
-              <span>SID: 12125543</span>
+              <span>SID: {user?.customer?.sid}</span>
               <span className="hidden h-4 w-px bg-white/30 sm:block" />
-              <span>Joined on 12 Jan 2024</span>
+              <span>{user?.customer?.createdAt}</span>
             </div>
           </div>
         </div>
@@ -282,7 +302,7 @@ function ProfileHero() {
           />
 
           <QuickAction
-            href="/withdraw"
+            href="/funds/withdraw"
             label="Withdraw"
             description="Withdraw Funds"
             icon={<ArrowUpFromLine size={23} />}
@@ -380,16 +400,6 @@ function TradingSummaryCard({
 }: {
   item: SummaryItem;
 }) {
-  const positive = item.percentage >= 0;
-  const chartData = item.chart.map((value, index) => ({
-    index,
-    value,
-  }));
-
-  const gradientId = `summary-${item.title
-    .toLowerCase()
-    .replaceAll(" ", "-")}`;
-
   return (
     <Card
       bordered={false}
@@ -424,25 +434,6 @@ function TradingSummaryCard({
             )}
           </div>
 
-          <div
-            className={`mt-2 flex items-center gap-1 text-xs font-semibold ${
-              positive
-                ? "text-emerald-500"
-                : "text-rose-500"
-            }`}
-          >
-            {positive ? (
-              <ArrowUpOutlined />
-            ) : (
-              <ArrowDownOutlined />
-            )}
-
-            <span>{Math.abs(item.percentage)}%</span>
-          </div>
-
-          <p className="mt-1 text-[11px] text-slate-400">
-            from yesterday
-          </p>
         </div>
       </div>
 

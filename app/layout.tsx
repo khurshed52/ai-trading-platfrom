@@ -3,6 +3,7 @@ import "react-international-phone/style.css";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import AntDesignProvider from "@/components/providers/AntDesignProvider";
 import QueryProvider from "@/components/providers/query-provider";
+import GeminiChat from "@/components/chat/gemini-chat";
 import { Sora } from "next/font/google";
 import "./globals.css";
 
@@ -29,9 +30,10 @@ export default function RootLayout({
       <body className={`${sora.className} flex min-h-full flex-col`}>
         <AntdRegistry>
           <AntDesignProvider>
-              <QueryProvider>
-               {children}
-             </QueryProvider>
+            <QueryProvider>
+              {children}
+              <GeminiChat />
+            </QueryProvider>
           </AntDesignProvider>
         </AntdRegistry>
       </body>
