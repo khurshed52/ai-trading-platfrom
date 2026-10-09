@@ -6,13 +6,14 @@ import {
   createSkrillDeposit,
   createUsdtDeposit,
   getDepositExchangeRate,
+  initiateStripeDeposit,
 } from "@/services/deposit.services";
 import type { DepositExchangeRateParams } from "@/services/deposit.services";
 
 export function useDepositExchangeRate({
   fromCurrency,
   toCurrency,
-  paymentMethod = 0,
+  amount,
 }: DepositExchangeRateParams) {
   const normalizedFromCurrency = fromCurrency.trim().toUpperCase();
   const normalizedToCurrency = toCurrency.trim().toUpperCase();
@@ -22,16 +23,22 @@ export function useDepositExchangeRate({
       "deposit-exchange-rate",
       normalizedFromCurrency,
       normalizedToCurrency,
-      paymentMethod,
+      amount,
     ],
     queryFn: () =>
       getDepositExchangeRate({
         fromCurrency: normalizedFromCurrency,
         toCurrency: normalizedToCurrency,
-        paymentMethod,
+        amount,
       }),
     enabled: Boolean(normalizedFromCurrency && normalizedToCurrency),
     gcTime: 0,
+  });
+}
+
+export function useInitiateStripeDeposit() {
+  return useMutation({
+    mutationFn: initiateStripeDeposit,
   });
 }
 

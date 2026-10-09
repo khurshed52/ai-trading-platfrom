@@ -50,7 +50,7 @@ export default function DashboardShell({
         />
 
         <Content className="!min-h-[calc(100vh-76px)] !min-w-0 !overflow-x-hidden !bg-[#f4f7fb]">
-          <main className="w-full min-w-0 p-4 sm:p-6 lg:p-7">
+          <main className="w-full min-w-0 p-4 sm:p-6 lg:p-5">
             <div className="mx-auto w-full min-w-0 max-w-[1680px]">
               {children}
             </div>

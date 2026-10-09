@@ -4,6 +4,10 @@ export const ROUTES = {
     MARKETS: "/markets",
   },
 
+  ACCOUNTS: {
+    ROOT: "/accounts",
+  },
+
   AUTH: {
     LOGIN: "/login",
     REGISTER: "/register",
@@ -13,13 +17,25 @@ export const ROUTES = {
     TANSTACK: '/tanstack',
   },
 
-    FUNDS: {
-     DEPOSIT: "/funds/deposit",
-      WITHDRAW: "/funds/withdraw",
-      TRANSFER: "/funds/transfer",
-    },
+  FUNDS: {
+    DEPOSIT: "/funds/deposit",
+    WITHDRAW: "/funds/withdraw",
+    TRANSFER: "/funds/transfer",
+    HISTORY: "/funds/history",
+  },
 
-    PROFILE: {
-      KYC: "/profile/kyc",
-    },
+  PROFILE: {
+    ROOT: "/profile",
+    KYC: "/profile/kyc",
+  },
+
+  REPORTS: {
+    ROOT: "/reports",
+  },
+
+  SETTINGS: {
+    ROOT: "/settings",
+    PAYMENT_METHOD: "/settings/payment-method",
+    AGREEMENT: "/settings/agreement",
+  },
 } as const;

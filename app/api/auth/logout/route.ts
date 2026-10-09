@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  ACCESS_TOKEN_COOKIE,
+  BACKEND_REFRESH_COOKIE_NAME,
+  REFRESH_TOKEN_COOKIE,
+  REMEMBER_SESSION_COOKIE,
+} from "@/lib/auth-cookies";
 
 export async function POST() {
   const response = NextResponse.json({
@@ -7,9 +13,10 @@ export async function POST() {
     data: null,
   });
 
-  response.cookies.delete("access_token");
-  response.cookies.delete("refresh_token");
-  response.cookies.delete("remember_session");
+  response.cookies.delete(ACCESS_TOKEN_COOKIE);
+  response.cookies.delete(REFRESH_TOKEN_COOKIE);
+  response.cookies.delete(BACKEND_REFRESH_COOKIE_NAME);
+  response.cookies.delete(REMEMBER_SESSION_COOKIE);
 
   return response;
 }

@@ -1,9 +1,16 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import {
+  ACCESS_TOKEN_COOKIE,
+  BACKEND_REFRESH_COOKIE_NAME,
+  extractRefreshCookie,
+  isSafeCookieName,
+  REFRESH_TOKEN_COOKIE,
+  REMEMBER_SESSION_COOKIE,
+} from "@/lib/auth-cookies";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const REMEMBER_ME_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-const REMEMBER_SESSION_COOKIE = "remember_session";
 
 type RefreshResponseData = {
   accessToken?: string;
@@ -19,8 +26,9 @@ type BackendRefreshResponse = {
 };
 
 function clearAuthCookies(response: NextResponse) {
-  response.cookies.delete("access_token");
-  response.cookies.delete("refresh_token");
+  response.cookies.delete(ACCESS_TOKEN_COOKIE);
+  response.cookies.delete(REFRESH_TOKEN_COOKIE);
+  response.cookies.delete(BACKEND_REFRESH_COOKIE_NAME);
   response.cookies.delete(REMEMBER_SESSION_COOKIE);
 }
 
@@ -31,7 +39,14 @@ export async function POST() {
     }
 
     const cookieStore = await cookies();
-    const refreshToken = cookieStore.get("refresh_token")?.value;
+    const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+    const storedBackendCookieName = cookieStore.get(
+      BACKEND_REFRESH_COOKIE_NAME,
+    )?.value;
+    const backendCookieName =
+      storedBackendCookieName && isSafeCookieName(storedBackendCookieName)
+        ? storedBackendCookieName
+        : "refreshToken";
     const rememberSession =
       cookieStore.get(REMEMBER_SESSION_COOKIE)?.value === "1";
 
@@ -53,23 +68,37 @@ export async function POST() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${refreshToken}`,
+        Cookie: `${backendCookieName}=${refreshToken}`,
       },
-      body: JSON.stringify({ refreshToken }),
       cache: "no-store",
     });
     const result = (await backendResponse.json()) as BackendRefreshResponse;
     const accessToken = result.data?.accessToken ?? result.data?.token;
 
     if (!backendResponse.ok || result.statusCode !== 200 || !accessToken) {
+      const refreshRejected =
+        backendResponse.status === 401 ||
+        backendResponse.status === 403 ||
+        result.statusCode === 103 ||
+        result.statusCode === 401 ||
+        result.statusCode === 403;
       const response = NextResponse.json(
         {
           statusCode: result.statusCode || backendResponse.status,
           message: result.message || "Unable to refresh session",
           data: null,
         },
-        { status: backendResponse.ok ? 401 : backendResponse.status },
+        {
+          status: refreshRejected
+            ? 401
+            : backendResponse.ok
+              ? 503
+              : backendResponse.status,
+        },
       );
-      clearAuthCookies(response);
+      if (refreshRejected) {
+        clearAuthCookies(response);
+      }
       return response;
     }
 
@@ -79,7 +108,7 @@ export async function POST() {
       data: null,
     });
 
-    response.cookies.set("access_token", accessToken, {
+    response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -87,17 +116,32 @@ export async function POST() {
       ...(rememberSession && { maxAge: REMEMBER_ME_MAX_AGE_SECONDS }),
     });
 
+    const rotatedBackendCookie = extractRefreshCookie(backendResponse.headers);
     const rotatedRefreshToken =
-      result.data?.refreshToken ?? result.data?.refresh_Token;
+      result.data?.refreshToken ??
+      result.data?.refresh_Token ??
+      rotatedBackendCookie?.value;
 
     if (rotatedRefreshToken) {
-      response.cookies.set("refresh_token", rotatedRefreshToken, {
+      response.cookies.set(REFRESH_TOKEN_COOKIE, rotatedRefreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
         ...(rememberSession && { maxAge: REMEMBER_ME_MAX_AGE_SECONDS }),
       });
+
+      response.cookies.set(
+        BACKEND_REFRESH_COOKIE_NAME,
+        rotatedBackendCookie?.name ?? backendCookieName,
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          ...(rememberSession && { maxAge: REMEMBER_ME_MAX_AGE_SECONDS }),
+        },
+      );
     }
 
     return response;
@@ -108,9 +152,8 @@ export async function POST() {
         message: error instanceof Error ? error.message : "Unable to refresh session",
         data: null,
       },
-      { status: 500 },
+      { status: 503 },
     );
-    clearAuthCookies(response);
     return response;
   }
 }

@@ -1,25 +1,12 @@
 import { internalApiFetch } from "@/lib/api";
+import type { TransferFundsParams, TransferResponse } from "@/types/transfer";
 
-export type TransferExchangeRateParams = {
-  fromCurrency: string;
-  toCurrency: string;
-  paymentMethod?: number;
-};
-
-export function getTransferExchangeRate({
-  fromCurrency,
-  toCurrency,
-  paymentMethod = 0,
-}: TransferExchangeRateParams) {
-  const searchParams = new URLSearchParams({
-    FromCurrency: fromCurrency.trim().toUpperCase(),
-    ToCurrency: toCurrency.trim().toUpperCase(),
-    TransactionType: "transfer",
-    PaymentMethod: String(paymentMethod),
+export function transferFunds({ payload, idempotencyKey }: TransferFundsParams) {
+  return internalApiFetch<TransferResponse>("/api/backend/funds/transfer", {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(payload),
   });
-
-  return internalApiFetch<number>(
-    `/api/backend/Miscellaneous/GetExchangeRate?${searchParams.toString()}`,
-    { method: "GET" },
-  );
 }

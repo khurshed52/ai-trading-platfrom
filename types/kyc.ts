@@ -16,6 +16,20 @@ export enum KycStatus {
 
 export type KycStep = 1 | 2 | 3;
 
+export type KycDashboardModalType =
+  | "onboarding"
+  | "continue"
+  | "action-required";
+
+export type KycState = {
+  showDashboardModal: boolean;
+  modalType: KycDashboardModalType | null;
+  currentStep: KycStep | null;
+  submitted: boolean;
+  approved: boolean;
+  correctiveActionRequired: boolean;
+};
+
 export type KycJourneyState = "completed" | "active" | "pending";
 
 export type KycPersonalProfile = {

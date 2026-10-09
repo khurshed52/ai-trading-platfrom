@@ -27,7 +27,7 @@ import {
 
 const { Header } = Layout;
 const { Text, Title } = Typography;
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { notifyAuthLogout } from "@/lib/auth-events";
 import { useUserDetail } from "@/hooks/useUser";
@@ -66,19 +66,23 @@ export default function DashboardHeader({
   onOpenMobileMenu,
 }: DashboardHeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const { mutate: logout } = useLogout();
   const { data: userData } = useUserDetail();
   const user = userData?.data;
-  const firstName = user?.customer_FirstName?.trim();
+  const firstName =
+    user?.customer?.customerFirstName?.trim() ||
+    user?.customer_FirstName?.trim();
   const fullName = [
-    user?.customer_FirstName,
+    user?.customer?.customerFirstName || user?.customer_FirstName,
     user?.customer_MiddleName,
-    user?.customer_LastName,
+    user?.customer?.customerLastName || user?.customer_LastName,
   ]
     .map((namePart) => namePart?.trim())
     .filter(Boolean)
     .join(" ");
+  const isProfilePage = pathname === ROUTES.PROFILE.ROOT;
 
   function handleProfileMenuClick({
     key,
@@ -136,11 +140,15 @@ export default function DashboardHeader({
             level={4}
             className="!mb-0 !truncate !text-[16px] !font-bold !text-slate-950 sm:!text-[18px]"
           >
-            Welcome back{firstName ? `, ${firstName}` : ""} 👋
+            {isProfilePage
+              ? "Profile"
+              : `Welcome back${firstName ? `, ${firstName}` : ""} 👋`}
           </Title>
 
           <Text className="!hidden !text-xs !text-slate-500 sm:!block">
-            Here&apos;s what&apos;s happening with your portfolio today.
+            {isProfilePage
+              ? "View your personal information and account status."
+              : "Here's what's happening with your portfolio today."}
           </Text>
         </div>
 

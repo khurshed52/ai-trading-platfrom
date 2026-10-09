@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { Select, Space, Input } from "antd";
+import { useMemo, type FocusEventHandler } from "react";
+import { Select, Space } from "antd";
 import {
   defaultCountries,
   FlagImage,
@@ -19,6 +19,7 @@ export type PhoneValue = {
 type PhoneNumberInputProps = {
   value?: PhoneValue;
   onChange?: (value: PhoneValue) => void;
+  onBlur?: FocusEventHandler<HTMLInputElement>;
   disabled?: boolean;
   placeholder?: string;
   id?: string;
@@ -35,6 +36,7 @@ const EMPTY_PHONE_VALUE: PhoneValue = {
 export default function PhoneNumberInput({
   value = EMPTY_PHONE_VALUE,
   onChange,
+  onBlur,
   disabled = false,
   placeholder = "Enter phone number",
   id,
@@ -65,6 +67,7 @@ export default function PhoneNumberInput({
 
   const {
     phone,
+    inputValue,
     inputRef,
     country,
     setCountry,
@@ -73,6 +76,8 @@ export default function PhoneNumberInput({
     defaultCountry,
     value: value.fullPhone ?? "",
     countries: defaultCountries,
+    disableDialCodeAndPrefix: true,
+    disableDialCodePrefill: true,
 
     onChange: ({
       phone: nextFullPhone,
@@ -88,6 +93,12 @@ export default function PhoneNumberInput({
         normalizedFullPhone,
         countryCode,
       );
+
+      // The phone library initializes its selected country on mount. Do not
+      // turn that internal setup into a form change before the user interacts.
+      if (!phoneNumber && !value.fullPhone) {
+        return;
+      }
 
       onChange?.({
         countryCode,
@@ -131,7 +142,11 @@ export default function PhoneNumberInput({
   }
 
   return (
-    <Space.Compact className="phone-number-input w-full">
+    <Space.Compact
+      className={`phone-number-input w-full${
+        disabled ? " phone-number-input-disabled" : ""
+      }`}
+    >
       <Select
         showSearch
         value={country.iso2}
@@ -178,7 +193,7 @@ export default function PhoneNumberInput({
               size="22px"
             />
 
-            <span className="text-sm">
+            <span className="text-base">
               +{country.dialCode}
             </span>
           </div>
@@ -191,6 +206,11 @@ export default function PhoneNumberInput({
         aria-label="Select phone country"
       />
 
+      <span
+        aria-hidden="true"
+        className="phone-number-divider"
+      />
+
       {/*
         A native input is used because usePhoneInput expects its ref
         to point directly to an HTMLInputElement.
@@ -199,26 +219,14 @@ export default function PhoneNumberInput({
         id={id}
         ref={inputRef}
         type="tel"
-        value={phone}
+        value={inputValue}
         disabled={disabled}
         onChange={handlePhoneValueChange}
+        onBlur={onBlur}
         placeholder={placeholder}
         autoComplete="tel"
         inputMode="tel"
-        className="
-          min-w-0 flex-1
-          border border-l-0 border-[#d9d9d9]
-          bg-white px-[11px]
-          text-base text-slate-900
-          outline-none transition
-          placeholder:text-[#bfbfbf]
-          hover:border-blue-400
-          focus:border-blue-500
-          focus:shadow-[0_0_0_2px_rgba(5,145,255,0.1)]
-          disabled:cursor-not-allowed
-          disabled:bg-[#f5f5f5]
-          disabled:text-black/25
-        "
+        className="phone-number-native-input"
       />
     </Space.Compact>
   );

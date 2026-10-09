@@ -4,6 +4,7 @@ import type {
   KycJourneyItem,
   KycPersonalInformationValues,
   KycProfileData,
+  KycState,
   KycStep,
   ProfileCompletion,
   UpdateKycProfileRequest,
@@ -62,6 +63,72 @@ export function isKycStatus(status: string): status is KycStatus {
 
 export function getKycStepFromStatus(status: KycStatus): KycStep {
   return statusStepMap[status];
+}
+
+export function getKycState(status: KycStatus): KycState {
+  if (status === KycStatus.COMPLETED) {
+    return {
+      showDashboardModal: false,
+      modalType: null,
+      currentStep: null,
+      submitted: true,
+      approved: false,
+      correctiveActionRequired: false,
+    };
+  }
+
+  if (status === KycStatus.APPROVED) {
+    return {
+      showDashboardModal: false,
+      modalType: null,
+      currentStep: null,
+      submitted: true,
+      approved: true,
+      correctiveActionRequired: false,
+    };
+  }
+
+  const correctiveActionRequired =
+    status === KycStatus.IDENTITY_REJECTED || status === KycStatus.REJECTED;
+
+  return {
+    showDashboardModal: true,
+    modalType:
+      status === KycStatus.REGISTERED
+        ? "onboarding"
+        : correctiveActionRequired
+          ? "action-required"
+          : "continue",
+    currentStep: getKycStepFromStatus(status),
+    submitted: false,
+    approved: false,
+    correctiveActionRequired,
+  };
+}
+
+export function canAccessKycProtectedRoutes(status: KycStatus): boolean {
+  return getKycState(status).approved;
+}
+
+export function getKycProtectedRouteMessage(
+  status: KycStatus | null,
+): string {
+  if (!status) {
+    return "We are checking your verification status. Please try again shortly.";
+  }
+
+  if (status === KycStatus.COMPLETED) {
+    return "Your verification is under review. This feature will unlock after approval.";
+  }
+
+  if (
+    status === KycStatus.IDENTITY_REJECTED ||
+    status === KycStatus.REJECTED
+  ) {
+    return "Review your identity verification to unlock this feature.";
+  }
+
+  return "Complete identity verification to access this feature.";
 }
 
 export function getKycJourney(

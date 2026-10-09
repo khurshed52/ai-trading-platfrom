@@ -2,7 +2,9 @@
 
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { UserDetail } from "@/services/user.services";
 import {
   ArrowRightOutlined,
@@ -36,6 +38,9 @@ import {
 
 const { Title, Text } = Typography;
 import { useUserDetail, useTradingSummary } from "@/hooks/useUser";
+import { KycVerificationModal } from "@/components/kyc/kyc-verification-modal";
+import { ROUTES } from "@/constants/routes";
+import { getKycState, isKycStatus } from "@/lib/kyc";
 
 type SummaryItem = {
   title: string;
@@ -200,10 +205,23 @@ const marketItems: MarketItem[] = [
 ];
 
 export default function DashboardPage() {
-  const { data: userData } = useUserDetail();
+  const router = useRouter();
+  const [isKycModalDismissed, setIsKycModalDismissed] = useState(false);
+  const { data: userData, isSuccess: isUserDetailResolved } = useUserDetail();
   const { data: tradingData } = useTradingSummary();
   const user = userData?.data;
   const tradingSummary = tradingData?.data;
+  const kycStatus = user?.status;
+  const resolvedKycStatus =
+    kycStatus && isKycStatus(kycStatus) ? kycStatus : null;
+  const kycState = resolvedKycStatus
+    ? getKycState(resolvedKycStatus)
+    : null;
+  const shouldShowKycModal = Boolean(
+    isUserDetailResolved &&
+      !isKycModalDismissed &&
+      kycState?.showDashboardModal,
+  );
 
   const summaryValues = tradingSummary
     ? [
@@ -228,22 +246,34 @@ export default function DashboardPage() {
   }));
 
   return (
-    <div className="space-y-5">
-      <ProfileHero user={user} />
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {dashboardSummaryItems.map((item) => (
-          <TradingSummaryCard
-            key={item.title}
-            item={item}
-          />
-        ))}
-      </section>
+    <>
+      <div className="space-y-5">
+        <ProfileHero user={user} />
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {dashboardSummaryItems.map((item) => (
+            <TradingSummaryCard
+              key={item.title}
+              item={item}
+            />
+          ))}
+        </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(460px,0.95fr)]">
-        <NotificationsCard />
-        <MarketSnapshotCard />
-      </section>
-    </div>
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(460px,0.95fr)]">
+          <NotificationsCard />
+          <MarketSnapshotCard />
+        </section>
+      </div>
+
+      {resolvedKycStatus && kycState ? (
+        <KycVerificationModal
+          open={shouldShowKycModal}
+          status={resolvedKycStatus}
+          state={kycState}
+          onDismiss={() => setIsKycModalDismissed(true)}
+          onContinue={() => router.push(ROUTES.PROFILE.KYC)}
+        />
+      ) : null}
+    </>
   );
 }
 

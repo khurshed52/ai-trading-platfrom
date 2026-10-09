@@ -23,14 +23,17 @@ body {
 } 
 
 .phone-number-input {
+  box-sizing: border-box;
   display: flex;
   align-items: stretch;
   width: 100%;
-  height: 54px;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
 
   overflow: hidden;
-  border: 1px solid #d8e1ef;
-  border-radius: 12px;
+  border: 1px solid #d7dfeb;
+  border-radius: 10px;
   background: #ffffff;
 
   transition:
@@ -39,12 +42,12 @@ body {
 }
 
 .phone-number-input:hover {
-  border-color: #94b6f2;
+  border-color: #1468f3;
 }
 
 .phone-number-input:focus-within {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+  border-color: #1468f3;
+  box-shadow: 0 0 0 3px rgb(20 104 243 / 10%);
 }
 
 .phone-country-select {
@@ -95,7 +98,7 @@ body {
 
   color: #0f172a;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 15px;
   outline: none;
 }
 
@@ -130,10 +133,11 @@ body {
 }
 
 .tradepro-sidebar-menu .ant-menu-item {
-  width: calc(100% - 24px);
+  box-sizing: border-box;
+  width: calc(100% - 24px) !important;
   height: 46px;
-  margin: 3px 12px;
-  border-radius: 10px;
+  margin: 3px 12px !important;
+  border-radius: 9px !important;
   color: rgb(226 232 240 / 82%);
   font-size: 14px;
   font-weight: 500;
@@ -157,6 +161,44 @@ body {
 
 .tradepro-sidebar-menu .ant-menu-item .anticon {
   font-size: 18px;
+}
+
+.tradepro-sidebar-menu .ant-menu-submenu-title {
+  box-sizing: border-box;
+  width: calc(100% - 24px) !important;
+  height: 46px;
+  margin: 3px 12px !important;
+  border-radius: 9px !important;
+  color: rgb(226 232 240 / 82%);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 46px;
+}
+
+.tradepro-sidebar-menu .ant-menu-submenu-title:hover,
+.tradepro-sidebar-menu .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  color: #ffffff !important;
+  background: rgb(59 130 246 / 16%) !important;
+}
+
+.tradepro-sidebar-menu .ant-menu-submenu-title .anticon {
+  font-size: 18px;
+}
+
+.tradepro-sidebar-menu .ant-menu-sub.ant-menu-inline {
+  background: rgb(2 12 30 / 36%) !important;
+}
+
+.tradepro-sidebar-menu .ant-menu-sub .ant-menu-item {
+  height: 42px;
+  line-height: 42px;
+}
+
+.tradepro-sidebar-menu .ant-menu-item-disabled,
+.tradepro-sidebar-menu .ant-menu-submenu-disabled > .ant-menu-submenu-title {
+  cursor: not-allowed !important;
+  color: rgb(148 163 184 / 66%) !important;
+  background: transparent !important;
 }
 
 .tradepro-sidebar-menu .ant-menu-title-content a {

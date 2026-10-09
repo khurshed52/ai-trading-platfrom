@@ -1,9 +1,14 @@
 import { internalApiFetch } from "@/lib/api";
+import type {
+  DepositExchangeRateData,
+  InitiateStripeDepositRequest,
+  StripeDepositResponse,
+} from "@/types/deposit";
 
 export type DepositExchangeRateParams = {
   fromCurrency: string;
   toCurrency: string;
-  paymentMethod?: number;
+  amount: 1;
 };
 
 export type DepositRequest = {
@@ -24,18 +29,34 @@ export type BankTransferDepositRequest = DepositRequest & {
 export async function getDepositExchangeRate({
   fromCurrency,
   toCurrency,
-  paymentMethod = 0,
+  amount,
 }: DepositExchangeRateParams) {
-  const searchParams = new URLSearchParams({
-    FromCurrency: fromCurrency.trim().toUpperCase(),
-    ToCurrency: toCurrency.trim().toUpperCase(),
-    TransactionType: "deposit",
-    PaymentMethod: String(paymentMethod),
-  });
+  return internalApiFetch<DepositExchangeRateData>(
+    "/api/backend/funds/exchange-rate",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        fromCurrency,
+        toCurrency: toCurrency.trim().toUpperCase(),
+        amount,
+      }),
+    },
+  );
+}
 
-  return internalApiFetch<number>(
-    `/api/backend/Miscellaneous/GetExchangeRate?${searchParams.toString()}`,
-    { method: "GET" },
+export function initiateStripeDeposit({
+  payload,
+  idempotencyKey,
+}: InitiateStripeDepositRequest) {
+  return internalApiFetch<StripeDepositResponse>(
+    "/api/backend/funds/deposit",
+    {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+    },
   );
 }
 

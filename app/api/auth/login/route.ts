@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import {
+  ACCESS_TOKEN_COOKIE,
+  BACKEND_REFRESH_COOKIE_NAME,
+  extractRefreshCookie,
+  REFRESH_TOKEN_COOKIE,
+  REMEMBER_SESSION_COOKIE,
+} from "@/lib/auth-cookies";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const REMEMBER_ME_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-const REMEMBER_SESSION_COOKIE = "remember_session";
 
 type LoginRequestBody = {
   email: string;
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
       data: result.data,
     });
 
-    nextResponse.cookies.set("access_token", accessToken, {
+    nextResponse.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -93,15 +99,31 @@ export async function POST(request: Request) {
       ...persistenceOptions,
     });
 
-    const refreshToken = result.data.refreshToken ?? result.data.refresh_Token;
+    const backendRefreshCookie = extractRefreshCookie(response.headers);
+    const refreshToken =
+      result.data.refreshToken ??
+      result.data.refresh_Token ??
+      backendRefreshCookie?.value;
     if (refreshToken) {
-      nextResponse.cookies.set("refresh_token", refreshToken, {
+      nextResponse.cookies.set(REFRESH_TOKEN_COOKIE, refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
         ...persistenceOptions,
       });
+
+      nextResponse.cookies.set(
+        BACKEND_REFRESH_COOKIE_NAME,
+        backendRefreshCookie?.name ?? "refreshToken",
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          ...persistenceOptions,
+        },
+      );
     }
 
     if (rememberMe) {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Skeleton } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 import { KycCompletionState } from "@/components/kyc/kyc-completion-state";
 import { KycProgress } from "@/components/kyc/kyc-progress";
@@ -10,6 +11,7 @@ import { IdentityDocumentStep } from "@/components/kyc/kyc-placeholder-steps";
 import { PersonalInformationStep } from "@/components/kyc/personal-information-step";
 import { SignDocumentsStep } from "@/components/kyc/sign-documents-step";
 import { VerificationAssistant } from "@/components/kyc/verification-assistant";
+import { ROUTES } from "@/constants/routes";
 import {
   useIdentityVerificationSession,
   useKycProfile,
@@ -34,6 +36,7 @@ import type {
 } from "@/types/kyc";
 
 export default function KycPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const statusQuery = useKycStatus();
   const statusValue = statusQuery.data?.data.status;
@@ -60,6 +63,13 @@ export default function KycPage() {
   const verificationUrl = getSafeVerificationUrl(
     identitySessionQuery.data?.data.verificationUrl,
   );
+  const isApproved = status === KycStatus.APPROVED;
+
+  useEffect(() => {
+    if (isApproved) {
+      router.replace(ROUTES.PROFILE.ROOT);
+    }
+  }, [isApproved, router]);
 
   if (!statusQuery.data && statusQuery.isFetching && !statusQuery.isError) {
     return <KycPageSkeleton />;
@@ -83,10 +93,13 @@ export default function KycPage() {
     );
   }
 
+  if (isApproved) {
+    return <KycPageSkeleton />;
+  }
+
   if (
     submissionComplete ||
-    status === KycStatus.COMPLETED ||
-    status === KycStatus.APPROVED
+    status === KycStatus.COMPLETED
   ) {
     return <KycCompletionState />;
   }

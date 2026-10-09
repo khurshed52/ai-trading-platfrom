@@ -11,6 +11,7 @@ import { ROUTES } from "@/constants/routes";
 import type { RegisterFormValues } from "@/types/auth";
 import PhoneNumberInput from "@/components/form/phone-number-input";
 import {
+  useLogin,
   useRegister,
   useResendRegistrationOtp,
   useVerifyRegistrationOtp,
@@ -28,6 +29,7 @@ export default function RegisterPage() {
     message: string;
   } | null>(null);
   const { mutate: register, isPending } = useRegister();
+  const login = useLogin();
   const verifyOtp = useVerifyRegistrationOtp();
   const resendOtp = useResendRegistrationOtp();
 
@@ -77,7 +79,23 @@ export default function RegisterPage() {
       },
       {
         onSuccess: () => {
-          router.push(ROUTES.AUTH.LOGIN);
+          const password = form.getFieldValue("password");
+
+          login.mutate(
+            {
+              email: verificationEmail,
+              password,
+              rememberMe: false,
+            },
+            {
+              onSuccess: () => {
+                router.replace(ROUTES.PUBLIC.DASHBOARD);
+              },
+              onError: () => {
+                router.replace(ROUTES.AUTH.LOGIN);
+              },
+            },
+          );
         },
         onError: (error) => {
           setOtpFeedback({
@@ -206,6 +224,7 @@ export default function RegisterPage() {
 
               <Form.Item
                 name="phone"
+                validateTrigger="onBlur"
                 rules={[
                   {
                     validator: (_, phone) =>
@@ -369,11 +388,15 @@ export default function RegisterPage() {
                 type="primary"
                 block
                 className="!mt-6"
-                loading={verifyOtp.isPending}
+                loading={verifyOtp.isPending || login.isPending}
                 disabled={otp.length !== 6}
                 onClick={handleVerifyOtp}
               >
-                {verifyOtp.isPending ? "Verifying..." : "Verify & Continue"}
+                {login.isPending
+                  ? "Opening dashboard..."
+                  : verifyOtp.isPending
+                    ? "Verifying..."
+                    : "Verify & Continue"}
               </Button>
 
               <div className="mt-5 text-center text-sm text-slate-500">

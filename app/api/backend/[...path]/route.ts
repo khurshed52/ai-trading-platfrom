@@ -34,6 +34,7 @@ async function handleRequest(
     }
 
     const url = `${BASE_URL}${endpoint}${request.nextUrl.search}`;
+    const idempotencyKey = request.headers.get("idempotency-key");
 
     let body: string | undefined;
 
@@ -50,6 +51,9 @@ async function handleRequest(
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
+        ...(idempotencyKey && {
+          "Idempotency-Key": idempotencyKey,
+        }),
       },
 
       ...(body && {

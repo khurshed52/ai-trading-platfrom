@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  BankOutlined,
   CheckCircleFilled,
   CreditCardOutlined,
   DollarOutlined,
@@ -12,19 +11,17 @@ import {
 import {
   Button,
   App,
+  Alert,
   Card,
-  Col,
   Form,
   InputNumber,
   Radio,
-  Row,
   Select,
   Typography,
 } from "antd";
 import type { FormProps } from "antd";
 import {
   Landmark,
-  WalletCards,
 } from "lucide-react";
 import {
   useBankTransferDeposit,
@@ -33,6 +30,11 @@ import {
   useSkrillDeposit,
   useUsdtDeposit,
 } from "@/hooks/useDeposit";
+import { useAllTradingAccounts } from "@/hooks/useAccounts";
+import { useStripeDepositFlow } from "@/hooks/useStripeDepositFlow";
+import { useUserDetail } from "@/hooks/useUser";
+import { useSearchParams } from "next/navigation";
+import type { TradingAccount } from "@/types/accounts";
 
 const { Text, Title } = Typography;
 const DEPOSIT_PSP_URL = "https://www.khurshedkhan.dev/";
@@ -45,23 +47,12 @@ type DepositMethodId =
   | "card"
   | "usdt" 
   | "skrill"
-  | "bitcoin";
+  | "stripe";
 
 type DepositFormValues = {
   paymentMethod: DepositMethodId;
-  tradingAccount: string;
   currency: CurrencyCode;
   amount: number;
-};
-
-type TradingAccount = {
-  id: string;
-  label: string;
-  accountNumber: string;
-  accountType: string;
-  currency: CurrencyCode;
-  equity: number;
-  balance: number;
 };
 
 type DepositMethod = {
@@ -69,31 +60,10 @@ type DepositMethod = {
   title: string;
   processingTime: string;
   feeLabel: string;
-  feePercentage: number;
+  feePercentage?: number;
   icon: React.ReactNode;
   recommended?: boolean;
 };
-
-const tradingAccounts: TradingAccount[] = [
-  {
-    id: "primary-mt5",
-    label: "Primary MT5 Account",
-    accountNumber: "1012345678",
-    accountType: "MT5",
-    currency: "USD",
-    equity: 24850.75,
-    balance: 24850.75,
-  },
-  {
-    id: "secondary-mt5",
-    label: "Secondary MT5 Account",
-    accountNumber: "1012345691",
-    accountType: "MT5",
-    currency: "EUR",
-    equity: 12840.45,
-    balance: 12100.2,
-  },
-];
 
 const depositMethods: DepositMethod[] = [
   {
@@ -137,6 +107,13 @@ const depositMethods: DepositMethod[] = [
       </div>
     ),
   },
+  {
+    id: "stripe",
+    title: "Stripe",
+    processingTime: "Secure Online Payment",
+    feeLabel: "Fee unavailable",
+    icon: <CreditCardOutlined className="text-[28px] text-indigo-600" />,
+  },
 ];
 
 const currencyOptions = [
@@ -166,19 +143,40 @@ function formatMoney(
   return `${formattedValue} ${currency}`;
 }
 
+function parseExchangeRate(value: string | undefined): number | undefined {
+  const rate = Number(value);
+  return Number.isFinite(rate) && rate > 0 ? rate : undefined;
+}
+
 export default function DepositForm() {
+  const searchParams = useSearchParams();
   const [form] = Form.useForm<DepositFormValues>();
   const { message } = App.useApp();
   const bankTransferDeposit = useBankTransferDeposit();
   const creditDebitDeposit = useCreditDebitDeposit();
   const skrillDeposit = useSkrillDeposit();
   const usdtDeposit = useUsdtDeposit();
+  const accountsQuery = useAllTradingAccounts();
+  const userQuery = useUserDetail();
+  const userId = userQuery.data?.data.id;
+  const stripeDeposit = useStripeDepositFlow(userId);
 
   const [selectedMethod, setSelectedMethod] =
     useState<DepositMethodId>("bank-transfer");
 
+  const linkedAccountId = searchParams.get("accountId")?.trim() ?? "";
+  const linkedAccountNumber =
+    searchParams.get("accountNumber")?.trim() ?? "";
+  const tradingAccounts = useMemo(
+    () =>
+      (accountsQuery.data?.data ?? []).filter(
+        (account) => account.status.trim().toUpperCase() === "ACTIVE",
+      ),
+    [accountsQuery.data?.data],
+  );
+
   const [selectedAccountId, setSelectedAccountId] =
-    useState("primary-mt5");
+    useState("");
 
   const [currency, setCurrency] =
     useState<CurrencyCode>("USD");
@@ -193,19 +191,31 @@ export default function DepositForm() {
   } = useDepositExchangeRate({
     fromCurrency: "USD",
     toCurrency: currency,
-    paymentMethod: 0,
+    amount: 1,
   });
 
-  const apiExchangeRate = exchangeRateResponse?.data;
-  const exchangeRate = apiExchangeRate === 0 ? 1 : apiExchangeRate;
+  const exchangeRate = parseExchangeRate(
+    exchangeRateResponse?.data.exchangeRate,
+  );
 
-  const selectedAccount = useMemo(
-    () =>
+  const selectedAccount = useMemo(() => {
+    const linkedAccount = tradingAccounts.find(
+      (account) =>
+        account.id === linkedAccountId ||
+        account.accountNumber === linkedAccountNumber,
+    );
+
+    return (
       tradingAccounts.find(
         (account) => account.id === selectedAccountId,
-      ) ?? tradingAccounts[0],
-    [selectedAccountId],
-  );
+      ) ?? linkedAccount ?? tradingAccounts[0]
+    );
+  }, [
+    linkedAccountId,
+    linkedAccountNumber,
+    selectedAccountId,
+    tradingAccounts,
+  ]);
 
   const selectedDepositMethod = useMemo(
     () =>
@@ -217,7 +227,7 @@ export default function DepositForm() {
 
   const feeAmount =
     amount *
-    (selectedDepositMethod.feePercentage / 100);
+    ((selectedDepositMethod.feePercentage ?? 0) / 100);
 
   const receiveAmount = Math.max(
     amount - feeAmount,
@@ -227,10 +237,43 @@ export default function DepositForm() {
     exchangeRate !== undefined && exchangeRate > 0
       ? receiveAmount / exchangeRate
       : undefined;
+  const verifiedReceiveAmount = convertedReceiveAmount;
 
   const handleSubmit: FormProps<DepositFormValues>["onFinish"] = (
     values,
   ) => {
+    if (!selectedAccount) {
+      message.error("Select an active trading account before continuing.");
+      return;
+    }
+
+    if (!Number.isFinite(values.amount) || values.amount <= 0) {
+      message.error("Enter a deposit amount greater than zero.");
+      return;
+    }
+
+    if (values.paymentMethod === "stripe") {
+      if (!userId) {
+        message.error("Your account information is still loading.");
+        return;
+      }
+
+      if (values.currency !== "USD") {
+        message.error(
+          "The current Stripe deposit contract confirms USD deposits only.",
+        );
+        return;
+      }
+
+      stripeDeposit.startNewAttempt({
+        accountNumber: selectedAccount.accountNumber,
+        amount: values.amount,
+        currency: values.currency,
+        provider: "STRIPE",
+      });
+      return;
+    }
+
     if (convertedReceiveAmount === undefined) {
       message.error("The exchange rate is not available yet.");
       return;
@@ -285,9 +328,6 @@ export default function DepositForm() {
           onSuccess: redirectToPsp,
         });
         break;
-      case "bitcoin":
-        message.info("The Bitcoin deposit API is not configured yet.");
-        break;
     }
   };
 
@@ -298,7 +338,6 @@ export default function DepositForm() {
       requiredMark={false}
       initialValues={{
         paymentMethod: "bank-transfer",
-        tradingAccount: "primary-mt5",
         currency: "USD",
         amount: undefined,
       }}
@@ -319,7 +358,11 @@ export default function DepositForm() {
           />
 
           <TradingAccountSection
-            selectedAccountId={selectedAccountId}
+            accounts={tradingAccounts}
+            loading={accountsQuery.isLoading}
+            error={accountsQuery.isError ? accountsQuery.error.message : undefined}
+            onRetry={() => accountsQuery.refetch()}
+            selectedAccountId={selectedAccount?.id ?? ""}
             onChange={(accountId) => {
               const account =
                 tradingAccounts.find(
@@ -328,11 +371,6 @@ export default function DepositForm() {
                 );
 
               setSelectedAccountId(accountId);
-
-              form.setFieldValue(
-                "tradingAccount",
-                accountId,
-              );
 
               if (account) {
                 setCurrency(account.currency);
@@ -350,7 +388,7 @@ export default function DepositForm() {
             amount={amount}
             feePercentage={selectedDepositMethod.feePercentage}
             receiveAmount={receiveAmount}
-            convertedReceiveAmount={convertedReceiveAmount}
+            convertedReceiveAmount={verifiedReceiveAmount}
             exchangeRate={exchangeRate}
             isExchangeRateLoading={isExchangeRateLoading}
             exchangeRateError={
@@ -376,6 +414,44 @@ export default function DepositForm() {
             }}
           />
 
+          {stripeDeposit.recoverableAttempt && (
+            <Alert
+              showIcon
+              type="warning"
+              message={
+                stripeDeposit.recoverableAttempt.state === "initiated"
+                  ? "Stripe Checkout needs attention"
+                  : stripeDeposit.recoverableAttempt.state === "conflict"
+                    ? "This deposit conflicts with an existing attempt"
+                  : "A previous Stripe deposit has an uncertain result"
+              }
+              description={`Account ${stripeDeposit.recoverableAttempt.requestBody.accountNumber} · ${formatMoney(
+                stripeDeposit.recoverableAttempt.requestBody.amount,
+                stripeDeposit.recoverableAttempt.requestBody.currency as CurrencyCode,
+              )}. Retry sends the exact same request and idempotency key.`}
+              action={
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    size="small"
+                    type="primary"
+                    loading={stripeDeposit.isPending}
+                    onClick={stripeDeposit.retryRecoverableAttempt}
+                  >
+                    Retry original attempt
+                  </Button>
+                  <Button
+                    size="small"
+                    disabled={stripeDeposit.isPending}
+                    onClick={stripeDeposit.dismissRecoverableAttempt}
+                  >
+                    Remove reminder
+                  </Button>
+                </div>
+              }
+              className="!rounded-xl"
+            />
+          )}
+
           <Button
             type="primary"
             htmlType="submit"
@@ -385,11 +461,18 @@ export default function DepositForm() {
               bankTransferDeposit.isPending ||
               creditDebitDeposit.isPending ||
               skrillDeposit.isPending ||
-              usdtDeposit.isPending
+              usdtDeposit.isPending ||
+              stripeDeposit.isPending
+            }
+            disabled={
+              accountsQuery.isLoading ||
+              accountsQuery.isError ||
+              !selectedAccount ||
+              (selectedMethod === "stripe" && !userId)
             }
             className="!h-14 !rounded-xl !text-base !font-semibold"
           >
-            Add Balance
+            {selectedMethod === "stripe" ? "Continue to Stripe" : "Add Balance"}
           </Button>
         </div>
 
@@ -397,8 +480,12 @@ export default function DepositForm() {
           account={selectedAccount}
           method={selectedDepositMethod}
           amount={amount}
-          fee={feeAmount}
-          convertedReceiveAmount={convertedReceiveAmount}
+          fee={
+            selectedDepositMethod.feePercentage === undefined
+              ? undefined
+              : feeAmount
+          }
+          convertedReceiveAmount={verifiedReceiveAmount}
           currency={currency}
         />
       </div>
@@ -449,17 +536,14 @@ function DepositMethodSection({
           }
           className="!w-full"
         >
-          <Row gutter={[12, 12]}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
             {depositMethods.map((method) => {
               const selected =
                 method.id === selectedMethod;
 
               return (
-                <Col
+                <div
                   key={method.id}
-                  xs={24}
-                  sm={12}
-                  lg={6}
                 >
                   <label
                     className={[
@@ -504,10 +588,10 @@ function DepositMethodSection({
                       <CheckCircleFilled className="absolute right-2.5 top-2.5 text-blue-600" />
                     )}
                   </label>
-                </Col>
+                </div>
               );
             })}
-          </Row>
+          </div>
         </Radio.Group>
       </Form.Item>
     </Card>
@@ -515,11 +599,19 @@ function DepositMethodSection({
 }
 
 type TradingAccountSectionProps = {
+  accounts: TradingAccount[];
+  loading: boolean;
+  error?: string;
+  onRetry: () => void;
   selectedAccountId: string;
   onChange: (accountId: string) => void;
 };
 
 function TradingAccountSection({
+  accounts,
+  loading,
+  error,
+  onRetry,
   selectedAccountId,
   onChange,
 }: TradingAccountSectionProps) {
@@ -538,28 +630,46 @@ function TradingAccountSection({
         title="Select Trading Account"
       />
 
-      <Form.Item
-        name="tradingAccount"
-        rules={[
-          {
-            required: true,
-            message:
-              "Please select a trading account",
-          },
-        ]}
-        className="!mb-0 !mt-2"
-      >
+      <div className="mt-2">
         <Select
           value={selectedAccountId}
           onChange={onChange}
+          loading={loading}
+          disabled={loading || Boolean(error) || accounts.length === 0}
+          placeholder={loading ? "Loading accounts..." : "Select an account"}
+          notFoundContent="No eligible active accounts"
           suffixIcon={<DownOutlined />}
           className="funds-control-select !w-full"
-          options={tradingAccounts.map((account) => ({
+          options={accounts.map((account) => ({
             value: account.id,
-            label: `${account.label} · ${account.accountNumber} · ${account.currency}`,
+            label: `${account.accountNumber} · ${account.platform} · ${account.currency}`,
           }))}
         />
-      </Form.Item>
+      </div>
+
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="Trading accounts could not be loaded"
+          description={error}
+          action={
+            <Button size="small" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+          className="!mt-2 !rounded-xl"
+        />
+      )}
+
+      {!loading && !error && accounts.length === 0 && (
+        <Alert
+          type="info"
+          showIcon
+          message="No active trading accounts are available for deposits."
+          className="!mt-2 !rounded-xl"
+        />
+      )}
     </Card>
   );
 }
@@ -567,7 +677,7 @@ function TradingAccountSection({
 type DepositAmountSectionProps = {
   currency: CurrencyCode;
   amount: number;
-  feePercentage: number;
+  feePercentage?: number;
   receiveAmount: number;
   convertedReceiveAmount?: number;
   exchangeRate?: number;
@@ -630,7 +740,17 @@ function DepositAmountSection({
             },
             {
               validator: (_, value) => {
-                if (typeof value !== "number" || value <= 0) {
+                if (typeof value !== "number") {
+                  return Promise.resolve();
+                }
+
+                if (value <= 0) {
+                  return Promise.reject(
+                    new Error("Enter a deposit amount greater than zero"),
+                  );
+                }
+
+                if (feePercentage === undefined) {
                   return Promise.resolve();
                 }
 
@@ -709,14 +829,18 @@ function DepositAmountSection({
               )}
               {!isExchangeRateLoading &&
                 !exchangeRateError &&
-                exchangeRate !== undefined && (
+                (exchangeRate !== undefined ? (
                   <span>
                     1 USD ={" "}
                     {exchangeRate.toLocaleString("en-US", {
                       maximumFractionDigits: 8,
                     })} {currency}
                   </span>
-                )}
+                ) : (
+                  <Text type="secondary" className="!text-xs">
+                    Rate unavailable
+                  </Text>
+                ))}
             </div>
           </div>
 
@@ -724,17 +848,20 @@ function DepositAmountSection({
             <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Account receives
             </p>
-            <p
-              className={`m-0 mt-1 text-lg font-bold ${
-                amount > 0 &&
-                convertedReceiveAmount !== undefined &&
-                convertedReceiveAmount < MINIMUM_ACCOUNT_DEPOSIT_USD
-                  ? "text-red-600"
-                  : "text-emerald-600"
-              }`}
-            >
-              {formatMoney(convertedReceiveAmount ?? 0, "USD")}
-            </p>
+            {convertedReceiveAmount === undefined ? (
+              <p className="m-0 mt-1 text-sm font-semibold text-slate-500">—</p>
+            ) : (
+              <p
+                className={`m-0 mt-1 text-lg font-bold ${
+                  amount > 0 &&
+                  convertedReceiveAmount < MINIMUM_ACCOUNT_DEPOSIT_USD
+                    ? "text-red-600"
+                    : "text-emerald-600"
+                }`}
+              >
+                {formatMoney(convertedReceiveAmount, "USD")}
+              </p>
+            )}
           </div>
         </div>
 
@@ -751,10 +878,10 @@ function DepositAmountSection({
 }
 
 type DepositSummaryProps = {
-  account: TradingAccount;
+  account?: TradingAccount;
   method: DepositMethod;
   amount: number;
-  fee: number;
+  fee?: number;
   convertedReceiveAmount?: number;
   currency: CurrencyCode;
 };
@@ -797,12 +924,13 @@ function DepositSummary({
             value={
               <div className="text-right">
                 <p className="m-0 font-semibold text-white">
-                  {account.label}
+                  {account?.accountNumber ?? "No account selected"}
                 </p>
 
                 <p className="m-0 mt-1 text-xs text-slate-400">
-                  {account.accountNumber} ·{" "}
-                  {account.currency}
+                  {account
+                    ? `${account.platform} · ${account.currency}`
+                    : "—"}
                 </p>
               </div>
             }
@@ -825,7 +953,7 @@ function DepositSummary({
 
           <SummaryRow
             label="Fees"
-            value={formatMoney(fee, currency)}
+            value={fee === undefined ? "—" : formatMoney(fee, currency)}
           />
 
           <SummaryDivider />
@@ -834,10 +962,9 @@ function DepositSummary({
             label="You Will Receive"
             value={
               <span className="text-lg font-bold text-emerald-400">
-                {formatMoney(
-                  convertedReceiveAmount ?? 0,
-                  "USD",
-                )}
+                {convertedReceiveAmount === undefined
+                  ? "—"
+                  : formatMoney(convertedReceiveAmount, "USD")}
               </span>
             }
           />
@@ -920,15 +1047,5 @@ function SummaryRow({
 function SummaryDivider() {
   return (
     <div className="h-px bg-white/10" />
-  );
-}
-
-function FundMetricIcon() {
-  return (
-    <div className="flex items-center gap-0.5">
-      <span className="h-3 w-1 rounded-full bg-blue-400" />
-      <span className="h-5 w-1 rounded-full bg-blue-500" />
-      <span className="h-7 w-1 rounded-full bg-blue-600" />
-    </div>
   );
 }

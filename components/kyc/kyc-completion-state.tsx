@@ -17,7 +17,7 @@ export function KycCompletionState() {
 
   return (
     <section className="mx-auto flex min-h-[calc(100vh-150px)] max-w-5xl items-center justify-center py-6">
-      <div className="w-full overflow-hidden rounded-3xl border border-blue-100 bg-white px-5 py-10 text-center shadow-[0_24px_70px_rgba(37,99,235,0.10)] sm:px-10 sm:py-14">
+      <div className="w-full overflow-hidden rounded-3xl border border-blue-100 bg-white px-5 py-4 text-center shadow-[0_24px_70px_rgba(37,99,235,0.10)] sm:px-10 sm:py-5">
         <div className="relative mx-auto flex size-32 items-center justify-center sm:size-40">
           <div className="absolute inset-2 rounded-full bg-emerald-100 blur-xl" />
           <div className="relative flex size-24 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-emerald-500 text-5xl text-white shadow-[0_18px_38px_rgba(16,185,129,0.28)] sm:size-28">
@@ -36,10 +36,10 @@ export function KycCompletionState() {
           ))}
         </div>
 
-        <h1 className="mb-0 mt-5 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+        <h1 className="mb-0 mt-5 text-2xl font-bold tracking-tight text-slate-950 sm:text-2xl">
           Verification Submitted!
         </h1>
-        <p className="mx-auto mb-0 mt-4 max-w-2xl text-base leading-7 text-slate-500 sm:text-xl sm:leading-8">
+        <p className="mx-auto mb-0 mt-2 max-w-2xl text-base leading-4 text-slate-500 sm:base sm:leading-5">
           Your verification has been successfully submitted. Your account is
           now under review. We&apos;ll notify you once your verification is approved.
         </p>

@@ -6,9 +6,21 @@ export type ApiResponse<T> = {
   data: T;
 };
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly httpStatus: number,
+    public readonly apiStatusCode?: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
 const EXPIRED_SESSION_STATUS_CODE = 103;
 let clearSessionPromise: Promise<void> | null = null;
-let refreshSessionPromise: Promise<boolean> | null = null;
+type RefreshSessionResult = "refreshed" | "unauthorized" | "failed";
+let refreshSessionPromise: Promise<RefreshSessionResult> | null = null;
 
 function isSuccessfulStatus(statusCode: number): boolean {
   return statusCode === 100 || (statusCode >= 200 && statusCode < 300);
@@ -34,9 +46,9 @@ async function clearExpiredSession(): Promise<void> {
   window.location.replace("/login");
 }
 
-async function refreshSession(): Promise<boolean> {
+async function refreshSession(): Promise<RefreshSessionResult> {
   if (typeof window === "undefined") {
-    return false;
+    return "failed";
   }
 
   if (!refreshSessionPromise) {
@@ -49,9 +61,15 @@ async function refreshSession(): Promise<boolean> {
       .then(async (response) => {
         const result = (await response.json()) as ApiResponse<null>;
 
-        return response.ok && isSuccessfulStatus(result.statusCode);
+        if (response.ok && isSuccessfulStatus(result.statusCode)) {
+          return "refreshed" as const;
+        }
+
+        return response.status === 401 || response.status === 403
+          ? ("unauthorized" as const)
+          : ("failed" as const);
       })
-      .catch(() => false)
+      .catch(() => "failed" as const)
       .finally(() => {
         refreshSessionPromise = null;
       });
@@ -81,14 +99,18 @@ export async function apiFetch<T>(
     await response.json();
 
   if (!response.ok) {
-    throw new Error(
-      result.message || "API request failed"
+    throw new ApiRequestError(
+      result.message || "API request failed",
+      response.status,
+      result.statusCode,
     );
   }
 
   if (!isSuccessfulStatus(result.statusCode)) {
-    throw new Error(
-      result.message || "Something went wrong"
+    throw new ApiRequestError(
+      result.message || "Something went wrong",
+      response.status,
+      result.statusCode,
     );
   }
 
@@ -113,15 +135,26 @@ export async function internalApiFetch<T>(
   const sessionExpired =
     result.statusCode === EXPIRED_SESSION_STATUS_CODE || response.status === 401;
 
-  if (sessionExpired && (await refreshSession())) {
-    response = await fetch(endpoint, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-    });
-    result = (await response.json()) as ApiResponse<T>;
+  if (sessionExpired) {
+    const refreshResult = await refreshSession();
+
+    if (refreshResult === "refreshed") {
+      response = await fetch(endpoint, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+        },
+      });
+      result = (await response.json()) as ApiResponse<T>;
+    } else if (refreshResult === "unauthorized") {
+      await clearExpiredSession();
+      throw new Error(result.message || "Session expired");
+    } else {
+      throw new Error(
+        "We could not refresh your session. Please try again shortly.",
+      );
+    }
   }
 
   if (
@@ -133,14 +166,18 @@ export async function internalApiFetch<T>(
   }
 
   if (!response.ok) {
-    throw new Error(
-      result.message || "API request failed"
+    throw new ApiRequestError(
+      result.message || "API request failed",
+      response.status,
+      result.statusCode,
     );
   }
 
   if (!isSuccessfulStatus(result.statusCode)) {
-    throw new Error(
-      result.message || "Something went wrong"
+    throw new ApiRequestError(
+      result.message || "Something went wrong",
+      response.status,
+      result.statusCode,
     );
   }
 
