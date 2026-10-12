@@ -2,6 +2,7 @@ export const ROUTES = {
   PUBLIC: {
     DASHBOARD: "/dashboard",
     MARKETS: "/markets",
+    TRADEPRO_AI: "/tradepro-ai",
   },
 
   ACCOUNTS: {

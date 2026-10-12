@@ -1,4 +1,5 @@
 import {
+  getIpInfo,
   loginUser,
   logoutUser,
   registerUser,
@@ -9,7 +10,17 @@ import {
   verifyResetOtp,
   verifyRegistrationOtp,
 } from "@/services/auth.service";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+export function useIpInfo() {
+  return useQuery({
+    queryKey: ["ip-info"],
+    queryFn: getIpInfo,
+    staleTime: Infinity,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+}
 
 export function useLogin() {
   return useMutation({

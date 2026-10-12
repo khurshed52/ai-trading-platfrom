@@ -35,6 +35,11 @@ import { useStripeDepositFlow } from "@/hooks/useStripeDepositFlow";
 import { useUserDetail } from "@/hooks/useUser";
 import { useSearchParams } from "next/navigation";
 import type { TradingAccount } from "@/types/accounts";
+import {
+  depositMethods,
+  type DepositMethod,
+  type DepositMethodId,
+} from "@/constants/deposit-methods";
 
 const { Text, Title } = Typography;
 const DEPOSIT_PSP_URL = "https://www.khurshedkhan.dev/";
@@ -42,79 +47,11 @@ const MINIMUM_ACCOUNT_DEPOSIT_USD = 10;
 
 type CurrencyCode = "USD" | "EUR" | "INR";
 
-type DepositMethodId =
-  | "bank-transfer"
-  | "card"
-  | "usdt" 
-  | "skrill"
-  | "stripe";
-
 type DepositFormValues = {
   paymentMethod: DepositMethodId;
   currency: CurrencyCode;
   amount: number;
 };
-
-type DepositMethod = {
-  id: DepositMethodId;
-  title: string;
-  processingTime: string;
-  feeLabel: string;
-  feePercentage?: number;
-  icon: React.ReactNode;
-  recommended?: boolean;
-};
-
-const depositMethods: DepositMethod[] = [
-  {
-    id: "bank-transfer",
-    title: "Bank Transfer",
-    processingTime: "1–3 Business Days",
-    feeLabel: "No Fees",
-    feePercentage: 0,
-    icon: <Landmark size={28} />,
-    recommended: false,
-  },
-  {
-    id: "card",
-    title: "Credit / Debit Card",
-    processingTime: "Instant",
-    feeLabel: "2.5% Fee",
-    feePercentage: 2.5,
-    icon: <CreditCardOutlined className="text-[28px]" />,
-  },
-  {
-    id: "skrill",
-    title: "Skrill",
-    processingTime: "Instant",
-    feeLabel: "1.0% Fee",
-    feePercentage: 1,
-    icon: (
-      <span className="text-[30px] font-bold text-fuchsia-700">
-        S
-      </span>
-    ),
-  },
-  {
-    id: "usdt",
-    title: "USDT (TRC20)",
-    processingTime: "Instant",
-    feeLabel: "No Fees",
-    feePercentage: 0,
-    icon: (
-      <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500 text-lg font-bold text-white">
-        ₮
-      </div>
-    ),
-  },
-  {
-    id: "stripe",
-    title: "Stripe",
-    processingTime: "Secure Online Payment",
-    feeLabel: "Fee unavailable",
-    icon: <CreditCardOutlined className="text-[28px] text-indigo-600" />,
-  },
-];
 
 const currencyOptions = [
   {
@@ -130,6 +67,25 @@ const currencyOptions = [
     value: "INR",
   },
 ];
+
+function getDepositMethodIcon(methodId: DepositMethodId) {
+  switch (methodId) {
+    case "bank-transfer":
+      return <Landmark size={28} />;
+    case "skrill":
+      return <span className="text-[30px] font-bold text-fuchsia-700">S</span>;
+    case "usdt":
+      return (
+        <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500 text-lg font-bold text-white">
+          ₮
+        </div>
+      );
+    case "stripe":
+      return <CreditCardOutlined className="text-[28px] text-indigo-600" />;
+    case "card":
+      return <CreditCardOutlined className="text-[28px]" />;
+  }
+}
 
 function formatMoney(
   value: number,
@@ -559,7 +515,7 @@ function DepositMethodSection({
                     />
 
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-blue-600">
-                      {method.icon}
+                      {getDepositMethodIcon(method.id)}
                     </div>
 
                     <div className="min-w-0 pr-5">

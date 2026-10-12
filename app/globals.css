@@ -58,6 +58,7 @@ body {
 
 .phone-country-select.ant-select {
   height: 100%;
+  border: none !important;
 }
 
 .phone-country-select .ant-select-selector {
@@ -415,4 +416,8 @@ body {
 
 .ant-input-number-input-wrap {
   width: 100%;
+}
+
+.phone-country-select.ant-select {
+  border: none !important;
 }

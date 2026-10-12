@@ -1,3 +1,9 @@
+import {
+  isAuthLogoutInProgress,
+  notifyAuthLogout,
+  notifyAuthSessionExpired,
+} from "@/lib/auth-events";
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export type ApiResponse<T> = {
@@ -39,11 +45,15 @@ async function clearExpiredSession(): Promise<void> {
       },
     })
       .then(() => undefined)
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        clearSessionPromise = null;
+      });
   }
 
   await clearSessionPromise;
-  window.location.replace("/login");
+  notifyAuthLogout();
+  notifyAuthSessionExpired();
 }
 
 async function refreshSession(): Promise<RefreshSessionResult> {
@@ -136,6 +146,14 @@ export async function internalApiFetch<T>(
     result.statusCode === EXPIRED_SESSION_STATUS_CODE || response.status === 401;
 
   if (sessionExpired) {
+    if (isAuthLogoutInProgress()) {
+      throw new ApiRequestError(
+        "The session has been logged out",
+        response.status,
+        result.statusCode,
+      );
+    }
+
     const refreshResult = await refreshSession();
 
     if (refreshResult === "refreshed") {
@@ -161,6 +179,14 @@ export async function internalApiFetch<T>(
     result.statusCode === EXPIRED_SESSION_STATUS_CODE ||
     response.status === 401
   ) {
+    if (isAuthLogoutInProgress()) {
+      throw new ApiRequestError(
+        "The session has been logged out",
+        response.status,
+        result.statusCode,
+      );
+    }
+
     await clearExpiredSession();
     throw new Error(result.message || "Session expired");
   }

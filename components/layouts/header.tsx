@@ -29,7 +29,10 @@ const { Header } = Layout;
 const { Text, Title } = Typography;
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { notifyAuthLogout } from "@/lib/auth-events";
+import {
+  beginAuthLogout,
+  notifyAuthLogout,
+} from "@/lib/auth-events";
 import { useUserDetail } from "@/hooks/useUser";
 
 type DashboardHeaderProps = {
@@ -68,7 +71,7 @@ export default function DashboardHeader({
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const { mutate: logout } = useLogout();
+  const { isPending: isLoggingOut, mutate: logout } = useLogout();
   const { data: userData } = useUserDetail();
   const user = userData?.data;
   const firstName =
@@ -83,6 +86,7 @@ export default function DashboardHeader({
     .filter(Boolean)
     .join(" ");
   const isProfilePage = pathname === ROUTES.PROFILE.ROOT;
+  const isTradeProAiPage = pathname === ROUTES.PUBLIC.TRADEPRO_AI;
 
   function handleProfileMenuClick({
     key,
@@ -90,12 +94,13 @@ export default function DashboardHeader({
     key: string;
   }) {
     if (key === "logout") {
+      beginAuthLogout();
+      void queryClient.cancelQueries();
+
       logout(undefined, {
-        onSuccess: () => {
+        onSettled: () => {
           notifyAuthLogout();
-          queryClient.clear();
-          router.push(ROUTES.AUTH.LOGIN);
-          router.refresh();
+          router.replace(ROUTES.AUTH.LOGIN);
         },
       });
     }
@@ -148,7 +153,9 @@ export default function DashboardHeader({
           <Text className="!hidden !text-xs !text-slate-500 sm:!block">
             {isProfilePage
               ? "View your personal information and account status."
-              : "Here's what's happening with your portfolio today."}
+              : isTradeProAiPage
+                ? "Your AI companion is here to help you trade smarter."
+                : "Here's what's happening with your portfolio today."}
           </Text>
         </div>
 
@@ -158,7 +165,11 @@ export default function DashboardHeader({
             prefix={
               <SearchOutlined className="text-slate-400" />
             }
-            placeholder="Search markets, assets..."
+            placeholder={
+              isTradeProAiPage
+                ? "Search accounts, transactions, or ask AI..."
+                : "Search markets, assets..."
+            }
             className="!hidden !h-11 !w-[250px] !rounded-xl !border-slate-200 xl:!flex"
           />
 
@@ -173,7 +184,11 @@ export default function DashboardHeader({
 
           <Dropdown
             menu={{
-              items: profileMenu,
+              items: profileMenu?.map((item) =>
+                item && "key" in item && item.key === "logout"
+                  ? { ...item, disabled: isLoggingOut }
+                  : item,
+              ),
               onClick: handleProfileMenuClick,
             }}
             placement="bottomRight"

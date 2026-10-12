@@ -13,18 +13,28 @@ const features = [
   { title: "Fast Execution", icon: Zap, color: "text-amber-500", background: "bg-amber-100/80" },
 ];
 
-export function TradeProBrand({ compact = false }: { compact?: boolean }) {
+export function TradeProBrand({
+  compact = false,
+  inverted = false,
+  iconOnly = false,
+}: {
+  compact?: boolean;
+  inverted?: boolean;
+  iconOnly?: boolean;
+}) {
   return (
     <div className="flex items-center gap-3">
       <div className={`${compact ? "size-11 rounded-xl" : "size-12 rounded-2xl"} flex items-center justify-center bg-blue-600 text-white shadow-lg shadow-blue-600/20`}>
         <TrendingUp size={compact ? 23 : 26} strokeWidth={2.4} />
       </div>
-      <div>
-        <p className={`${compact ? "text-xl" : "text-2xl"} m-0 font-bold tracking-tight text-slate-950`}>
-          Trade<span className="text-blue-600">Pro</span>
+      {!iconOnly ? <div>
+        <p className={`${compact ? "text-xl" : "text-2xl"} m-0 font-bold tracking-tight ${inverted ? "text-white" : "text-slate-950"}`}>
+          Trade<span className={inverted ? "text-blue-400" : "text-blue-600"}>Pro</span>
         </p>
-        <p className="m-0 text-xs font-medium text-slate-500">AI Trading Platform</p>
-      </div>
+        <p className={`m-0 text-xs font-medium ${inverted ? "text-slate-400" : "text-slate-500"}`}>
+          AI Trading Platform
+        </p>
+      </div> : null}
     </div>
   );
 }

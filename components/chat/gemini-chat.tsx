@@ -34,6 +34,12 @@ import {
   X,
 } from "lucide-react";
 import { AUTH_LOGOUT_EVENT } from "@/lib/auth-events";
+import {
+  AiChatRequestError,
+  streamAiChat,
+  type AiAnswerSource,
+  type AiAnswerSourceType,
+} from "@/services/ai-chat.service";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -42,21 +48,7 @@ type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  source?: AnswerSource;
-};
-
-type AnswerSourceType =
-  | "company_policy"
-  | "gemini"
-  | "internal_api"
-  | "market_data"
-  | "marketaux"
-  | "verified_tradepro";
-
-type AnswerSource = {
-  type: AnswerSourceType;
-  label: string;
-  updatedAt?: string;
+  source?: AiAnswerSource;
 };
 
 type ChatAttachment = {
@@ -134,16 +126,7 @@ const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
   webm: "video/webm",
 };
 
-const ANSWER_SOURCE_TYPES = new Set<AnswerSourceType>([
-  "company_policy",
-  "gemini",
-  "internal_api",
-  "market_data",
-  "marketaux",
-  "verified_tradepro",
-]);
-
-const SOURCE_BADGE_STYLES: Record<AnswerSourceType, string> = {
+const SOURCE_BADGE_STYLES: Record<AiAnswerSourceType, string> = {
   company_policy: "bg-violet-50 text-violet-700",
   gemini: "bg-slate-100 text-slate-600",
   internal_api: "bg-emerald-50 text-emerald-700",
@@ -152,7 +135,7 @@ const SOURCE_BADGE_STYLES: Record<AnswerSourceType, string> = {
   verified_tradepro: "bg-teal-50 text-teal-700",
 };
 
-function getSourceIcon(type: AnswerSourceType) {
+function getSourceIcon(type: AiAnswerSourceType) {
   switch (type) {
     case "company_policy":
       return <FileText size={13} />;
@@ -169,23 +152,7 @@ function getSourceIcon(type: AnswerSourceType) {
   }
 }
 
-function getAnswerSource(headers: Headers): AnswerSource | undefined {
-  const type = headers.get("X-Answer-Source") as AnswerSourceType | null;
-  const label = headers.get("X-Answer-Source-Label")?.trim();
-  const updatedAt = headers.get("X-Answer-Source-Updated-At") || undefined;
-
-  if (!type || !ANSWER_SOURCE_TYPES.has(type) || !label) {
-    return undefined;
-  }
-
-  return {
-    type,
-    label: label.slice(0, 80),
-    updatedAt,
-  };
-}
-
-function AnswerSourceBadge({ source }: { source: AnswerSource }) {
+function AnswerSourceBadge({ source }: { source: AiAnswerSource }) {
   return (
     <span
       title={source.updatedAt ? `Retrieved ${source.updatedAt}` : undefined}
@@ -334,101 +301,40 @@ export default function GeminiChat() {
     abortControllerRef.current = abortController;
 
     try {
-      const response = await fetch("/api/gemini/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message,
-          history: messages
-            .filter(
-              (chatMessage, index) =>
-                index > 0 && chatMessage.content.trim(),
-            )
-            .slice(-12)
-            .map((chatMessage) => ({
-              role: chatMessage.role,
-              content: chatMessage.content,
-            })),
-          file: selectedAttachment
-            ? {
-                name: selectedAttachment.name,
-                mimeType: selectedAttachment.mimeType,
-                data: selectedAttachment.data,
-              }
-            : undefined,
-        }),
-        signal: abortController.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => null)) as
-          | {
-              code?: string;
-              message?: string;
-              loginUrl?: string;
+      await streamAiChat({
+        message,
+        history: messages
+          .filter(
+            (chatMessage, index) =>
+              index > 0 && chatMessage.content.trim(),
+          )
+          .slice(-12)
+          .map((chatMessage) => ({
+            role: chatMessage.role,
+            content: chatMessage.content,
+          })),
+        file: selectedAttachment
+          ? {
+              name: selectedAttachment.name,
+              mimeType: selectedAttachment.mimeType,
+              data: selectedAttachment.data,
             }
-          | null;
-
-        if (response.status === 401 && errorData?.code === "AUTH_REQUIRED") {
-          const loginUrl = errorData.loginUrl || "/login";
-
+          : undefined,
+        signal: abortController.signal,
+        onChunk: (content, source) => {
           setMessages((currentMessages) =>
             currentMessages.map((chatMessage) =>
               chatMessage.id === assistantMessage.id
                 ? {
                     ...chatMessage,
-                    content: `${errorData.message}\n\n[Log in to continue](${loginUrl})`,
+                    content,
+                    source,
                   }
                 : chatMessage,
             ),
           );
-          return;
-        }
-
-        throw new Error(
-          errorData?.message || "Unable to send message.",
-        );
-      }
-
-      if (!response.body) {
-        throw new Error("Streaming response is unavailable.");
-      }
-
-      const responseSource = getAnswerSource(response.headers);
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      let accumulatedResponse = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-
-        if (done) {
-          break;
-        }
-
-        accumulatedResponse += decoder.decode(value, {
-          stream: true,
-        });
-
-        setMessages((currentMessages) =>
-          currentMessages.map((chatMessage) =>
-            chatMessage.id === assistantMessage.id
-                ? {
-                  ...chatMessage,
-                  content: accumulatedResponse,
-                  source: responseSource,
-                }
-              : chatMessage,
-          ),
-        );
-      }
-
-      if (!accumulatedResponse.trim()) {
-        throw new Error("Gemini returned an empty response.");
-      }
+        },
+      });
     } catch (error) {
       if (
         error instanceof DOMException &&
@@ -437,17 +343,25 @@ export default function GeminiChat() {
         return;
       }
 
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong.";
+      const authenticationRequired =
+        error instanceof AiChatRequestError &&
+        error.status === 401 &&
+        error.code === "AUTH_REQUIRED";
+      const errorMessage = error instanceof Error
+        ? error.message
+        : "Something went wrong.";
+      const content = authenticationRequired
+        ? `${errorMessage}\n\n[Log in to continue](${
+            error.loginUrl || "/login"
+          })`
+        : `Sorry, I could not respond: ${errorMessage}`;
 
       setMessages((currentMessages) =>
         currentMessages.map((chatMessage) =>
-          chatMessage.id === assistantMessage.id
+              chatMessage.id === assistantMessage.id
             ? {
                 ...chatMessage,
-                content: `Sorry, I could not respond: ${errorMessage}`,
+                content,
               }
             : chatMessage,
         ),

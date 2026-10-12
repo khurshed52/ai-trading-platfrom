@@ -1,16 +1,16 @@
-type TradingSummary = {
-  amount: number;
+type TradingAccount = {
+  id: string;
+  accountNumber: string;
+  platform: string;
   currency: string;
-  total_Profit: number;
-  total_Lot: number;
-  total_Swap: number;
-  total_OpenPosition: number;
+  balance: string;
+  status: string;
 };
 
 type TradingSummaryResponse = {
   statusCode: number;
   message: string;
-  data: TradingSummary | null;
+  data: TradingAccount[] | null;
 };
 
 export type TradingSummaryErrorCode =
@@ -29,7 +29,7 @@ export class TradingSummaryError extends Error {
 
 export async function getTradingSummary(
   accessToken: string,
-): Promise<TradingSummary> {
+): Promise<TradingAccount[]> {
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
   if (!backendBaseUrl) {
@@ -41,7 +41,7 @@ export async function getTradingSummary(
 
   try {
     const response = await fetch(
-      `${backendBaseUrl}Miscellaneous/GetTradingSummary`,
+      `${backendBaseUrl}accounts/all`,
       {
         method: "GET",
         cache: "no-store",
@@ -64,10 +64,14 @@ export async function getTradingSummary(
       );
     }
 
-    if (!response.ok || result.statusCode !== 100 || !result.data) {
+    const successfulStatus =
+      result.statusCode === 100 ||
+      (result.statusCode >= 200 && result.statusCode < 300);
+
+    if (!response.ok || !successfulStatus || !Array.isArray(result.data)) {
       throw new TradingSummaryError(
         "SERVICE_UNAVAILABLE",
-        "Your trading summary is temporarily unavailable. Please try again.",
+        "Your trading accounts are temporarily unavailable. Please try again.",
       );
     }
 
@@ -79,7 +83,7 @@ export async function getTradingSummary(
 
     throw new TradingSummaryError(
       "SERVICE_UNAVAILABLE",
-      "Your trading summary is temporarily unavailable. Please try again.",
+      "Your trading accounts are temporarily unavailable. Please try again.",
     );
   }
 }

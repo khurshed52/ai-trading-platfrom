@@ -5,6 +5,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { LoginFormValues } from "@/types/auth";
 import {
   AppleFilled,
@@ -25,6 +26,7 @@ import {
 
 import { ROUTES } from "@/constants/routes";
 import { useLogin } from "@/hooks/useAuth";
+import { completeAuthLogin } from "@/lib/auth-events";
 const { Title, Text } = Typography;
 const REMEMBERED_EMAIL_KEY = "tradepro_remembered_email";
 
@@ -59,10 +61,13 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [form] = Form.useForm<LoginFormValues>();
   const { mutate, isPending } = useLogin();
 
   useEffect(() => {
+    queryClient.clear();
+
     try {
       const rememberedEmail = window.localStorage.getItem(
         REMEMBERED_EMAIL_KEY,
@@ -77,7 +82,7 @@ export default function LoginPage() {
     } catch {
       // The login form still works when browser storage is unavailable.
     }
-  }, [form]);
+  }, [form, queryClient]);
 
   function handleSubmit(values: LoginFormValues) {
      mutate(
@@ -88,6 +93,8 @@ export default function LoginPage() {
       },
       {
         onSuccess: () => {
+          completeAuthLogin();
+
           try {
             if (values.remember) {
               window.localStorage.setItem(

@@ -1,4 +1,6 @@
 import tradeproKnowledge from "@/content/tradepro-knowledge.json";
+import { ROUTES } from "@/constants/routes";
+import { depositMethods } from "@/constants/deposit-methods";
 
 function normalizeQuestion(message: string): string {
   return message.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -8,14 +10,43 @@ function formatList(items: readonly string[]): string {
   return items.map((item) => `- **${item}**`).join("\n");
 }
 
-function getDepositMethodsAnswer(): string | null {
-  const fact = tradeproKnowledge.deposits.facts.find(
-    ({ topic }) => topic === "supportedMethods",
+function getDepositMethodsAnswer(): string {
+  const methods = depositMethods.map(
+    ({ title, processingTime, feeLabel }) =>
+      `${title} — ${processingTime}; ${feeLabel}`,
   );
 
-  return fact && Array.isArray(fact.value)
-    ? `TradePro supports these deposit methods:\n\n${formatList(fact.value)}`
-    : null;
+  return [
+    "TradePro currently provides these deposit methods:",
+    "",
+    formatList(methods),
+    "",
+    `[Open Deposit Funds](${ROUTES.FUNDS.DEPOSIT}).`,
+  ].join("\n");
+}
+
+function getWithdrawalInstructions(): string {
+  const availableBalance = tradeproKnowledge.withdrawals.facts.find(
+    ({ topic }) => topic === "availableBalance",
+  );
+  const balanceNote =
+    availableBalance && typeof availableBalance.value === "string"
+      ? availableBalance.value
+      : "Only your available withdrawable balance can be requested.";
+
+  return [
+    "To request withdrawal of all available funds:",
+    "",
+    `1. [Open the Withdraw Funds page](${ROUTES.FUNDS.WITHDRAW}).`,
+    "2. Select the trading account you want to withdraw from.",
+    "3. Enter that account’s available withdrawable amount and choose the payout currency.",
+    "4. Review the converted amount, then submit the withdrawal request.",
+    "5. If you have funds in multiple trading accounts, repeat these steps for each account.",
+    "",
+    `**Important:** ${balanceNote}`,
+    "",
+    "The displayed account balance may therefore be higher than the amount currently available to withdraw.",
+  ].join("\n");
 }
 
 function getAccountTypesAnswer(): string {
@@ -54,7 +85,11 @@ function getRegistrationAnswer(): string | null {
 
   const steps = registration.steps.map(
     ({ number, title, description }) =>
-      `${number}. **${title}** — ${description}`,
+      `${number}. **${title}** — ${description}${
+        title === "Open a Trading Account"
+          ? ` [Open the Accounts page](${ROUTES.ACCOUNTS.ROOT}).`
+          : ""
+      }`,
   );
 
   return `${registration.summary}\n\n${steps.join("\n")}`;
@@ -119,6 +154,16 @@ export function getDirectTradeProAnswer(message: string): string | null {
   }
 
   if (
+    /\bwithdraw(?:al|als|ing|n)?\b/.test(question) &&
+    /\b(?:want|need|would like|how|can i|help|guide|request|make|all|money|funds?)\b/.test(
+      question,
+    ) &&
+    !/\b(?:status|history|pending|waiting|delay|delayed|why)\b/.test(question)
+  ) {
+    return getWithdrawalInstructions();
+  }
+
+  if (
     /\baccount types?\b/.test(question) ||
     /\b(?:which|what) accounts? (?:do you|does tradepro) (?:offer|provide|have)\b/.test(
       question,
@@ -129,7 +174,7 @@ export function getDirectTradeProAnswer(message: string): string | null {
 
   if (
     /\bregistration (?:flow|process|steps)\b/.test(question) ||
-    /\bhow (?:can|do) i (?:register|create|open) (?:an? )?account\b/.test(
+    /\bhow (?:can|do) i (?:register|create|open) (?:an? )?(?:trading )?account\b/.test(
       question,
     )
   ) {

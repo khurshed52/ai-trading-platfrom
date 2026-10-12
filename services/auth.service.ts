@@ -72,6 +72,17 @@ export type ResetPasswordRequest = {
   newPassword: string;
 };
 
+export type IpInfoResponseData = {
+  ip: string;
+  country: string;
+  countryCode: string;
+  region: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+};
+
 export function loginUser(payload: LoginRequest) {
   return internalApiFetch("/api/auth/login", {
     method: "POST",
@@ -136,6 +147,10 @@ export function resendResetOtp(payload: ForgotPasswordRequest) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function getIpInfo() {
+  return apiFetch<IpInfoResponseData>("misc/ip-info");
 }
 
 export function logoutUser() {

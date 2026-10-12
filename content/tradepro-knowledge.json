@@ -68,12 +68,12 @@
     "facts": [
       {
         "topic": "registrationFlow",
-        "summary": "Create and verify an account, fund it, then sign in to MetaTrader 5 and start trading.",
+        "summary": "Register, complete identity verification, wait for approval, and then open a trading account from the Accounts page.",
         "steps": [
           {
             "number": 1,
             "title": "Create Your Account",
-            "description": "Register online in under 3 minutes and verify your identity with a government-issued ID.",
+            "description": "Register online and provide your personal and contact information.",
             "requirements": [
               "Full name and contact information",
               "Passport or Emirates ID",
@@ -82,24 +82,22 @@
           },
           {
             "number": 2,
-            "title": "Fund Your Account",
-            "description": "Deposit using a preferred supported payment method.",
-            "methods": [
-              "Credit or debit card",
-              "Bank transfer",
-              "Digital payments"
+            "title": "Complete Identity Verification",
+            "description": "Complete KYC using a valid government-issued ID.",
+            "requirements": [
+              "Passport or Emirates ID",
+              "Digital identity verification"
             ]
           },
           {
             "number": 3,
-            "title": "Start Trading",
-            "description": "Download MetaTrader 5, sign in with your credentials, and start trading.",
-            "features": [
-              "MetaTrader 5 (MT5)",
-              "Desktop, iOS, and Android",
-              "Access to more than 70 forex pairs",
-              "24/5 dedicated support"
-            ]
+            "title": "Wait for Approval",
+            "description": "Wait until your identity verification and customer profile are approved."
+          },
+          {
+            "number": 4,
+            "title": "Open a Trading Account",
+            "description": "After approval, open an MT4 or MT5 trading account from the Accounts page."
           }
         ],
         "verificationStatus": "provided"

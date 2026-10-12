@@ -12,11 +12,19 @@ import {
 import { getLatestMarketNews } from "@/lib/ai/tools/marketNews";
 import { getMarketPrice } from "@/lib/ai/tools/marketPrice";
 import {
+  FundsTransactionsError,
+  getFundsTransactions,
+} from "@/lib/ai/tools/fundsTransactions";
+import {
   getTradingSummary,
   TradingSummaryError,
 } from "@/lib/ai/tools/tradingSummary";
 import { getTradeProKnowledge } from "@/lib/ai/tools/tradeproKnowledge";
 import type { UserDetail } from "@/services/user.services";
+import type {
+  FundsTransaction,
+  TransactionFilters,
+} from "@/types/transactions";
 import { getDirectTradeProAnswer } from "@/lib/ai/directTradeProAnswers";
 import {
   getPrivacyPolicyAnswer,
@@ -53,10 +61,12 @@ type TradeProKnowledgeToolArguments = {
 
 type SessionValidationResult =
   | { status: "valid"; user: UserDetail }
-  | { status: "invalid" | "unavailable" };
+  | { status: "invalid" }
+  | { status: "unavailable" };
 
 type SessionValidationResponse = {
   statusCode?: number;
+  message?: string;
   data?: UserDetail | null;
 };
 
@@ -67,6 +77,13 @@ type DirectAccountIntent =
   | "email"
   | "sid"
   | "trading_summary";
+
+type DirectFundsIntent =
+  | "deposit_history"
+  | "pending_withdrawals"
+  | "transaction_history"
+  | "withdrawal_history"
+  | "withdrawals_except_completed";
 
 type AnswerSource = {
   type:
@@ -115,6 +132,7 @@ const SUPPORTED_FILE_TYPES = new Set([
 const MARKET_NEWS_PATTERNS = [
   /\b(?:news|headlines)\b/i,
   /\bmarket updates?\b/i,
+  /\b(?:latest|market|financial|forex|currency)\s+new\b/i,
 ];
 
 const RESTRICTED_GUEST_TOPIC_PATTERNS = [
@@ -146,9 +164,9 @@ forex news, currency news, or recent market updates, ALWAYS use the
 get_latest_market_news tool. For a general market-news request, call the
 tool immediately. Do not ask the user to choose an asset class first.
 
-If an authenticated user asks about their own trading balance, account
-currency, profit, lots, swaps, open positions, or trading summary, ALWAYS use
-the get_trading_summary tool. The tool contains private account data, so never
+If an authenticated user asks about their own trading accounts, balance,
+account currency, platform, or account status, ALWAYS use the
+get_trading_summary tool. The tool contains private account data, so never
 guess these values and never replace the tool call with general guidance.
 
 For every TradePro-specific question about account types, registration,
@@ -319,7 +337,68 @@ function getDirectAccountIntent(message: string): DirectAccountIntent | null {
     return "balance";
   }
 
+  if (/\b(?:trading )?accounts?\b/.test(normalizedMessage)) {
+    return "trading_summary";
+  }
+
   return null;
+}
+
+function getDirectFundsIntent(message: string): DirectFundsIntent | null {
+  const normalizedMessage = message.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  const isPersonal = /\b(?:my|mine|i|me)\b/.test(normalizedMessage);
+  const isWithdrawal = /\bwithdraw(?:al|als|ing|n)?\b/.test(normalizedMessage);
+  const isDeposit = /\bdeposits?\b/.test(normalizedMessage);
+  const asksToMakeWithdrawal =
+    isWithdrawal &&
+    /\b(?:want|need|would like|how|can i|help|guide|request|make|all|money|funds?)\b/.test(
+      normalizedMessage,
+    ) &&
+    !/\b(?:status|history|pending|waiting|delay|delayed|why)\b/.test(
+      normalizedMessage,
+    );
+  const asksForRecords =
+    /\b(?:all|check|give|history|recent|show|status|transactions?)\b/.test(
+      normalizedMessage,
+    );
+
+  if (
+    /\btransactions?\b/.test(normalizedMessage) &&
+    /\b(?:all|history|my|recent|show)\b/.test(normalizedMessage)
+  ) {
+    return "transaction_history";
+  }
+
+  if (isDeposit && (isPersonal || asksForRecords)) {
+    return "deposit_history";
+  }
+
+  if (asksToMakeWithdrawal) {
+    return null;
+  }
+
+  if (!isWithdrawal || (!isPersonal && !asksForRecords)) return null;
+
+  if (
+    /\b(?:except|exclude|excluding|without)\b.*\b(?:completed|processed)\b/.test(
+      normalizedMessage,
+    )
+  ) {
+    return "withdrawals_except_completed";
+  }
+
+  if (/\b(?:pending|waiting|delay|delayed|why)\b/.test(normalizedMessage)) {
+    return "pending_withdrawals";
+  }
+
+  return /\bstatus\b/.test(normalizedMessage) &&
+    !/\bhistory\b/.test(normalizedMessage)
+    ? "withdrawals_except_completed"
+    : "withdrawal_history";
+}
+
+function getRequestedAccountNumber(message: string): string | undefined {
+  return message.match(/\b\d{5,20}\b/)?.[0];
 }
 
 async function validateAccessToken(
@@ -330,7 +409,7 @@ async function validateAccessToken(
   }
 
   try {
-    const response = await fetch(`${backendBaseUrl}User/GetUserDetail`, {
+    const response = await fetch(`${backendBaseUrl}profile`, {
       method: "GET",
       cache: "no-store",
       headers: {
@@ -338,16 +417,38 @@ async function validateAccessToken(
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    const result = (await response.json()) as SessionValidationResponse;
+    const responseText = await response.text();
+    let result: SessionValidationResponse | null = null;
 
-    if (response.ok && result.statusCode === 100 && result.data) {
+    try {
+      result = responseText
+        ? (JSON.parse(responseText) as SessionValidationResponse)
+        : null;
+    } catch {
+      console.error(
+        "Chat session validation returned a non-JSON response:",
+        response.status,
+        responseText.slice(0, 160),
+      );
+    }
+
+    if (
+      response.ok &&
+      result?.data &&
+      (result.statusCode === 100 ||
+        (typeof result.statusCode === "number" &&
+          result.statusCode >= 200 &&
+          result.statusCode < 300))
+    ) {
       return { status: "valid", user: result.data };
     }
 
     if (
       response.status === 401 ||
       response.status === 403 ||
-      result.statusCode === 103
+      result?.statusCode === 103 ||
+      result?.statusCode === 401 ||
+      result?.statusCode === 403
     ) {
       return { status: "invalid" };
     }
@@ -359,45 +460,137 @@ async function validateAccessToken(
   }
 }
 
-function formatAccountNumber(value: number): string {
-  return value.toLocaleString("en-US", {
-    maximumFractionDigits: 8,
-  });
-}
-
 function createUserDetailAnswer(
   intent: "email" | "sid",
   user: UserDetail,
 ): string {
   if (intent === "email") {
-    return `Your registered email address is **${user.user_Email}**.`;
+    return `Your registered email address is **${user.email || user.user_Email}**.`;
   }
 
-  return `Your customer SID is **${user.customer_SID}**.`;
+  return `Your customer SID is **${user.customer?.sid || user.customer_SID}**.`;
 }
 
 function createTradingSummaryAnswer(
   intent: Exclude<DirectAccountIntent, "email" | "sid">,
-  summary: Awaited<ReturnType<typeof getTradingSummary>>,
+  accounts: Awaited<ReturnType<typeof getTradingSummary>>,
+  requestedAccountNumber?: string,
 ): string {
-  const currency = summary.currency;
+  const requestedAccount = requestedAccountNumber
+    ? accounts.find(
+        ({ accountNumber }) => accountNumber === requestedAccountNumber,
+      )
+    : undefined;
+
+  if (requestedAccountNumber && !requestedAccount) {
+    return `I could not find trading account **${requestedAccountNumber}** in your profile.`;
+  }
+
+  if (!accounts.length) {
+    return "You do not currently have any trading accounts.";
+  }
 
   switch (intent) {
-    case "balance":
-      return `Your trading balance is **${formatAccountNumber(summary.amount)} ${currency}**.`;
     case "profit":
-      return `Your total profit is **${formatAccountNumber(summary.total_Profit)} ${currency}**.`;
+      return "Profit is not included in the current trading-accounts response. You can view it in your trading platform.";
     case "open_positions":
-      return `You currently have **${formatAccountNumber(summary.total_OpenPosition)}** open positions.`;
+      return "Open-position totals are not included in the current trading-accounts response. You can view them in your trading platform.";
+    case "balance":
     case "trading_summary":
-      return [
-        `Balance: **${formatAccountNumber(summary.amount)} ${currency}**`,
-        `Total Profit: **${formatAccountNumber(summary.total_Profit)} ${currency}**`,
-        `Total Lots: **${formatAccountNumber(summary.total_Lot)}**`,
-        `Total Swaps: **${formatAccountNumber(summary.total_Swap)} ${currency}**`,
-        `Open Positions: **${formatAccountNumber(summary.total_OpenPosition)}**`,
-      ].join("\n");
+      break;
   }
+
+  const displayedAccounts = requestedAccount ? [requestedAccount] : accounts;
+
+  return [
+    displayedAccounts.length === 1
+      ? "Here is your trading account:"
+      : `Here are your **${displayedAccounts.length} trading accounts**:`,
+    "",
+    "| Account | Platform | Status | Balance |",
+    "| --- | --- | --- | --- |",
+    ...displayedAccounts.map(
+      (account) =>
+        `| **${account.accountNumber}** | ${account.platform} | **${account.status}** | **${formatAccountBalance(account.balance)} ${account.currency}** |`,
+    ),
+    "",
+    `[View all accounts and full details](${ROUTES.ACCOUNTS.ROOT}).`,
+  ].join("\n");
+}
+
+function formatAccountBalance(value: string): string {
+  const amount = Number(value);
+  return Number.isFinite(amount)
+    ? amount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 8,
+      })
+    : value;
+}
+
+function formatTransactionDate(value: string): string {
+  const transactionDate = new Date(value);
+  return Number.isNaN(transactionDate.getTime())
+    ? "Unavailable"
+    : `${new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "UTC",
+      }).format(transactionDate)} UTC`;
+}
+
+function getTransactionAccountNumber(transaction: FundsTransaction): string {
+  return transaction.account?.accountNumber ||
+    transaction.sourceAccount?.accountNumber ||
+    transaction.destinationAccount?.accountNumber ||
+    "—";
+}
+
+function createTransactionsAnswer(
+  intent: DirectFundsIntent,
+  transactions: FundsTransaction[],
+): string {
+  const sortedTransactions = [...transactions].sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() -
+      new Date(left.createdAt).getTime(),
+  );
+
+  if (!sortedTransactions.length) {
+    if (intent === "pending_withdrawals") {
+      return `You do not currently have any pending withdrawal requests. [View Funds History](${ROUTES.FUNDS.HISTORY}).`;
+    }
+
+    return `I could not find matching transactions. [View Funds History](${ROUTES.FUNDS.HISTORY}).`;
+  }
+
+  const recordLabel = intent === "deposit_history"
+    ? "deposit"
+    : intent === "transaction_history"
+      ? "transaction"
+      : "withdrawal";
+  const pendingPrefix = intent === "pending_withdrawals" ? "pending " : "";
+  const pluralSuffix = sortedTransactions.length === 1 ? "" : "s";
+  const pendingExplanation = intent === "pending_withdrawals"
+    ? [
+        "",
+        "The transaction service reports these requests as **PENDING**, but it does not return a specific pending-reason field. This means they have been submitted but are not completed yet. They may still be awaiting internal processing, a security review, or the payment provider; those are possible stages, not confirmed reasons for these specific requests.",
+      ]
+    : [];
+
+  return [
+    `I found **${sortedTransactions.length} ${pendingPrefix}${recordLabel}${pluralSuffix}**:`,
+    "",
+    "| Reference | Type | Account | Amount | Status | Requested on |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...sortedTransactions.map(
+      (transaction) =>
+        `| **${transaction.reference}** | ${transaction.type} | **${getTransactionAccountNumber(transaction)}** | **${formatAccountBalance(transaction.amount)} ${transaction.currency}** | **${transaction.status}** | ${formatTransactionDate(transaction.createdAt)} |`,
+    ),
+    ...pendingExplanation,
+    "",
+    `[View all transactions in Funds History](${ROUTES.FUNDS.HISTORY}).`,
+  ].join("\n");
 }
 
 function createTextResponse(
@@ -445,12 +638,14 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get("access_token")?.value;
     const directAccountIntent = getDirectAccountIntent(message);
-    const directTradeProAnswer = file
+    const directFundsIntent = getDirectFundsIntent(message);
+    const directTradeProAnswer = file || directFundsIntent
       ? null
       : getDirectTradeProAnswer(message);
     const privacyPolicyQuestion = !file && isPrivacyPolicyQuestion(message);
     const isRestrictedTopic =
       Boolean(directAccountIntent) ||
+      Boolean(directFundsIntent) ||
       continuesRestrictedNewsRequest(message, body.history) ||
       (!privacyPolicyQuestion && requiresLogin(message, file));
     let authenticatedUser: UserDetail | undefined;
@@ -472,7 +667,6 @@ export async function POST(request: Request) {
 
       if (sessionValidation.status === "invalid") {
         cookieStore.delete("access_token");
-        cookieStore.delete("refresh_token");
 
         return Response.json(
           {
@@ -519,6 +713,62 @@ export async function POST(request: Request) {
       }
     }
 
+    if (directFundsIntent && accessToken && authenticatedUser) {
+      try {
+        const filters: TransactionFilters = directFundsIntent === "deposit_history"
+          ? { type: "DEPOSIT" }
+          : directFundsIntent === "transaction_history"
+            ? {}
+            : directFundsIntent === "pending_withdrawals"
+              ? { type: "WITHDRAWAL", status: "PENDING" }
+              : { type: "WITHDRAWAL" };
+        const fetchedTransactions = await getFundsTransactions(
+          accessToken,
+          filters,
+        );
+        const transactions = directFundsIntent === "withdrawals_except_completed"
+          ? fetchedTransactions.filter(
+              ({ status }) => status !== "COMPLETED",
+            )
+          : fetchedTransactions;
+
+        return createTextResponse(
+          createTransactionsAnswer(directFundsIntent, transactions),
+          {
+            type: "internal_api",
+            label: "Your TradePro transactions",
+            updatedAt: new Date().toISOString(),
+          },
+        );
+      } catch (error) {
+        if (
+          error instanceof FundsTransactionsError &&
+          error.code === "SESSION_EXPIRED"
+        ) {
+          cookieStore.delete("access_token");
+          return Response.json(
+            {
+              code: "AUTH_REQUIRED",
+              message: error.message,
+              loginUrl: ROUTES.AUTH.LOGIN,
+            },
+            { status: 401 },
+          );
+        }
+
+        return Response.json(
+          {
+            code: "TRANSACTIONS_UNAVAILABLE",
+            message:
+              error instanceof FundsTransactionsError
+                ? error.message
+                : "Your transaction history is temporarily unavailable.",
+          },
+          { status: 503 },
+        );
+      }
+    }
+
     if (directAccountIntent && accessToken && authenticatedUser) {
       if (directAccountIntent === "email" || directAccountIntent === "sid") {
         return createTextResponse(
@@ -535,7 +785,11 @@ export async function POST(request: Request) {
         const tradingSummary = await getTradingSummary(accessToken);
 
         return createTextResponse(
-          createTradingSummaryAnswer(directAccountIntent, tradingSummary),
+          createTradingSummaryAnswer(
+            directAccountIntent,
+            tradingSummary,
+            getRequestedAccountNumber(message),
+          ),
           {
             type: "internal_api",
             label: "Your TradePro account",
@@ -548,7 +802,6 @@ export async function POST(request: Request) {
           error.code === "SESSION_EXPIRED"
         ) {
           cookieStore.delete("access_token");
-          cookieStore.delete("refresh_token");
 
           return Response.json(
             {
@@ -644,7 +897,6 @@ export async function POST(request: Request) {
           error.code === "SESSION_EXPIRED"
         ) {
           cookieStore.delete("access_token");
-          cookieStore.delete("refresh_token");
 
           return Response.json(
             {
@@ -667,40 +919,20 @@ export async function POST(request: Request) {
           { status: 503 },
         );
       }
-      const finalResponse = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite",
-        contents: [
-          ...historyContents,
-          {
-            role: "user",
-            parts: [
-              {
-                text: `
-The authenticated user asked:
-"${message}"
 
-Their current TradePro trading summary is:
-${JSON.stringify(tradingSummary)}
-
-Answer only the metric or metrics the user requested. Treat this data as
-private account data and do not infer values that are absent. Use the currency
-with monetary values. Format every numeric account value in Markdown bold,
-including its currency when present (for example, **2,190 USD**). Keep labels
-outside the bold text and keep the response concise.
-`,
-              },
-            ],
-          },
-        ],
-        config: {
-          temperature: 0,
-          maxOutputTokens: 250,
-        },
-      });
+      const summaryIntent =
+        directAccountIntent &&
+        directAccountIntent !== "email" &&
+        directAccountIntent !== "sid"
+          ? directAccountIntent
+          : "trading_summary";
 
       return createTextResponse(
-        finalResponse.text ||
-          `Your current trading balance is ${tradingSummary.amount.toLocaleString()} ${tradingSummary.currency}.`,
+        createTradingSummaryAnswer(
+          summaryIntent,
+          tradingSummary,
+          getRequestedAccountNumber(message),
+        ),
         {
           type: "internal_api",
           label: "Your TradePro account",
@@ -779,7 +1011,7 @@ guidance is a TradePro product, policy, time frame, fee, limit, or feature.
     }
 
     if (marketNewsCall) {
-      if (!accessToken || !authenticatedUser) {
+      if (!accessToken) {
         return Response.json(
           {
             code: "AUTH_REQUIRED",
@@ -788,6 +1020,36 @@ guidance is a TradePro product, policy, time frame, fee, limit, or feature.
           },
           { status: 401 },
         );
+      }
+
+      if (!authenticatedUser) {
+        const sessionValidation = await validateAccessToken(accessToken);
+
+        if (sessionValidation.status === "invalid") {
+          cookieStore.delete("access_token");
+
+          return Response.json(
+            {
+              code: "AUTH_REQUIRED",
+              message: "Your session has expired. Please try again.",
+              loginUrl: ROUTES.AUTH.LOGIN,
+            },
+            { status: 401 },
+          );
+        }
+
+        if (sessionValidation.status === "unavailable") {
+          return Response.json(
+            {
+              code: "SESSION_VALIDATION_UNAVAILABLE",
+              message:
+                "We could not verify your session right now. Please try again shortly.",
+            },
+            { status: 503 },
+          );
+        }
+
+        authenticatedUser = sessionValidation.user;
       }
 
       const news = await getLatestMarketNews();
@@ -831,7 +1093,7 @@ Markdown link to the original article. Do not invent stories or details.
         finalResponse.text || "No recent market news is available.",
         {
           type: "marketaux",
-          label: "Marketaux · Live market news",
+          label: "Marketaux - Live market news",
           updatedAt: new Date().toISOString(),
         },
       );

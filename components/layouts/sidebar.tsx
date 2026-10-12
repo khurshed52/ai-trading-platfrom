@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Drawer, Layout, Menu, Tooltip } from "antd";
@@ -20,7 +20,9 @@ import {
   UserOutlined,
   WalletOutlined,
 } from "@ant-design/icons";
+import { Sparkles } from "lucide-react";
 
+import { TradeProBrand } from "@/components/auth/auth-brand-panel";
 import { ROUTES } from "@/constants/routes";
 import { useUserDetail } from "@/hooks/useUser";
 import {
@@ -47,6 +49,7 @@ const navigationKeys = [
   ROUTES.FUNDS.TRANSFER,
   ROUTES.FUNDS.HISTORY,
   ROUTES.PUBLIC.MARKETS,
+  ROUTES.PUBLIC.TRADEPRO_AI,
   ROUTES.PROFILE.ROOT,
   ROUTES.REPORTS.ROOT,
   ROUTES.SETTINGS.PAYMENT_METHOD,
@@ -94,6 +97,7 @@ export default function DashboardSidebar({
         }}
       >
         <SidebarContent
+          key={`desktop-${selectedKey}`}
           collapsed={collapsed}
           selectedKey={selectedKey}
           hasProtectedAccess={hasProtectedAccess}
@@ -116,6 +120,7 @@ export default function DashboardSidebar({
         }}
       >
         <SidebarContent
+          key={`mobile-${selectedKey}`}
           collapsed={false}
           selectedKey={selectedKey}
           hasProtectedAccess={hasProtectedAccess}
@@ -142,10 +147,14 @@ function SidebarContent({
   protectedRouteMessage,
   onNavigate,
 }: SidebarContentProps) {
-  const defaultOpenKeys = [
-    ...(selectedKey.startsWith("/funds/") ? ["/funds"] : []),
-    ...(selectedKey.startsWith("/settings") ? [ROUTES.SETTINGS.ROOT] : []),
-  ];
+  const selectedParentKey = selectedKey.startsWith("/funds/")
+    ? "/funds"
+    : selectedKey.startsWith(ROUTES.SETTINGS.ROOT)
+      ? ROUTES.SETTINGS.ROOT
+      : undefined;
+  const [openKeys, setOpenKeys] = useState<string[]>(
+    selectedParentKey ? [selectedParentKey] : [],
+  );
   const navigationItems = createNavigationItems({
     hasProtectedAccess,
     protectedRouteMessage,
@@ -164,22 +173,7 @@ function SidebarContent({
           onClick={onNavigate}
           className="flex items-center gap-3"
         >
-          <div className="flex size-11 shrink-0 items-end justify-center gap-1 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 px-2.5 py-2.5 text-white shadow-[0_10px_25px_rgba(37,99,235,0.4)]">
-            <span className="h-2.5 w-1.5 rounded-sm bg-white" />
-            <span className="h-4 w-1.5 rounded-sm bg-white" />
-            <span className="h-6 w-1.5 rounded-sm bg-white" />
-          </div>
-
-          {!collapsed ? (
-            <div>
-              <p className="m-0 text-xl font-bold tracking-tight text-white">
-                Trade<span className="text-blue-400">Pro</span>
-              </p>
-              <p className="m-0 text-[10px] font-medium text-slate-400">
-                AI Trading Platform
-              </p>
-            </div>
-          ) : null}
+          <TradeProBrand compact inverted iconOnly={collapsed} />
         </Link>
       </div>
 
@@ -189,7 +183,13 @@ function SidebarContent({
           theme="dark"
           inlineCollapsed={collapsed}
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={defaultOpenKeys}
+          openKeys={openKeys}
+          onOpenChange={(nextOpenKeys) => {
+            const newlyOpenedKey = nextOpenKeys.find(
+              (key) => !openKeys.includes(key),
+            );
+            setOpenKeys(newlyOpenedKey ? [newlyOpenedKey] : []);
+          }}
           items={navigationItems}
           className="tradepro-sidebar-menu"
         />
@@ -282,6 +282,11 @@ function createNavigationItems({
       key: ROUTES.PUBLIC.MARKETS,
       icon: <FundOutlined />,
       label: label(ROUTES.PUBLIC.MARKETS, "Market"),
+    },
+    {
+      key: ROUTES.PUBLIC.TRADEPRO_AI,
+      icon: <Sparkles size={18} />,
+      label: label(ROUTES.PUBLIC.TRADEPRO_AI, "TradePro AI"),
     },
     {
       key: ROUTES.PROFILE.ROOT,

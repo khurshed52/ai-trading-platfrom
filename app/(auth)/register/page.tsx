@@ -148,7 +148,7 @@ export default function RegisterPage() {
           },
         }}
       >
-        <div className="bg-white px-6 py-6 shadow-lg sm:px-8 sm:py-8">
+        <div className="bg-white px-3 py-3 shadow-lg sm:px-4sm:py-4">
           <header className="mb-8 text-center">
             <Title
               level={1}

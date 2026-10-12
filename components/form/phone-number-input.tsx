@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, type FocusEventHandler } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  type FocusEventHandler,
+} from "react";
 import { Select, Space } from "antd";
 import {
   defaultCountries,
@@ -8,6 +13,8 @@ import {
   parseCountry,
   usePhoneInput,
 } from "react-international-phone";
+
+import { useIpInfo } from "@/hooks/useAuth";
 
 export type PhoneValue = {
   countryCode: string;
@@ -42,6 +49,8 @@ export default function PhoneNumberInput({
   id,
   defaultCountry = "in",
 }: PhoneNumberInputProps) {
+  const { data: ipInfoResponse } = useIpInfo();
+  const hasSelectedCountry = useRef(false);
   const countries = useMemo(
     () => defaultCountries.map(parseCountry),
     [],
@@ -76,6 +85,7 @@ export default function PhoneNumberInput({
     defaultCountry,
     value: value.fullPhone ?? "",
     countries: defaultCountries,
+    disableCountryGuess: true,
     disableDialCodeAndPrefix: true,
     disableDialCodePrefill: true,
 
@@ -109,7 +119,38 @@ export default function PhoneNumberInput({
     },
   });
 
+  const detectedCountryIso2 = useMemo(() => {
+    const countryCode = ipInfoResponse?.data.countryCode
+      ?.trim()
+      .toLowerCase();
+
+    return countries.some((item) => item.iso2 === countryCode)
+      ? countryCode
+      : undefined;
+  }, [countries, ipInfoResponse?.data.countryCode]);
+
+  useEffect(() => {
+    if (
+      !detectedCountryIso2 ||
+      hasSelectedCountry.current ||
+      value.fullPhone ||
+      value.countryIso2 ||
+      country.iso2 === detectedCountryIso2
+    ) {
+      return;
+    }
+
+    setCountry(detectedCountryIso2);
+  }, [
+    country.iso2,
+    detectedCountryIso2,
+    setCountry,
+    value.countryIso2,
+    value.fullPhone,
+  ]);
+
   function handleCountryChange(iso2: string) {
+    hasSelectedCountry.current = true;
     setCountry(iso2);
 
     const selectedCountry = countries.find(

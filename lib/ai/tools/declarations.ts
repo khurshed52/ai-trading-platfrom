@@ -47,7 +47,7 @@ export const getTradeProKnowledgeDeclaration = {
 export const getTradingSummaryDeclaration = {
   name: "get_trading_summary",
   description:
-    "Get the authenticated user's current TradePro trading balance, currency, total profit, total lots, total swaps, and total open positions. Always use this for questions about the user's own trading balance or trading summary.",
+    "Get the authenticated user's current TradePro trading accounts, including account number, platform, currency, status, and balance. Always use this for questions about the user's own trading accounts or account balances.",
   parameters: {
     type: Type.OBJECT,
     properties: {},
