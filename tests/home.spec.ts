@@ -34,7 +34,8 @@ test('login successfully redirects to dashboard', async ({ page, context }) => {
   await page.route('**/api/auth/login', async (route) => {
     expect(route.request().postDataJSON()).toEqual({
       email: loginCredentials.email,
-      login_Password: loginCredentials.password,
+      password: loginCredentials.password,
+      rememberMe: false,
     });
 
     await route.fulfill({
