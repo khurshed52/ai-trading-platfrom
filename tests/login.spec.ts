@@ -77,27 +77,6 @@ async function mockSuccessfulLogin(
     });
   });
 
-  await page.route(
-    "**/api/backend/Miscellaneous/GetTradingSummary",
-    async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          statusCode: 200,
-          message: "Trading summary fetched successfully",
-          data: {
-            amount: 1000,
-            currency: "USD",
-            total_Profit: 100,
-            total_Lot: 2,
-            total_Swap: 0,
-            total_OpenPosition: 1,
-          },
-        }),
-      });
-    },
-  );
 }
 
 test.describe("Login page", () => {

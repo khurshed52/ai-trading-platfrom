@@ -1,8 +1,6 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { PDFParse } from "pdf-parse";
-
 const pdfWorkerPath = path.join(
   process.cwd(),
   "node_modules",
@@ -12,8 +10,6 @@ const pdfWorkerPath = path.join(
   "esm",
   "pdf.worker.mjs",
 );
-
-PDFParse.setWorker(pathToFileURL(pdfWorkerPath).href);
 
 const PRIVACY_POLICY = {
   title: "Dragonfly Markets Privacy Policy (test source)",
@@ -145,6 +141,12 @@ function extractSections(text: string): PolicySection[] {
 }
 
 async function downloadAndParsePolicy(): Promise<PolicySection[]> {
+  // pdf-parse loads pdfjs and its native canvas adapter at module startup.
+  // Keep it out of the chat route's initialization path so a missing optional
+  // canvas binary cannot break unrelated Gemini or market-news requests.
+  const { PDFParse } = await import("pdf-parse");
+  PDFParse.setWorker(pathToFileURL(pdfWorkerPath).href);
+
   const url = validatePolicyUrl();
   const response = await fetch(url, {
     cache: "no-store",

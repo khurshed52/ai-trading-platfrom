@@ -36,27 +36,6 @@ async function mockDashboardApis(page: Page) {
     });
   });
 
-  await page.route(
-    "**/api/backend/Miscellaneous/GetTradingSummary",
-    async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          statusCode: 200,
-          message: "Trading summary fetched successfully",
-          data: {
-            amount: 1250,
-            currency: "USD",
-            total_Profit: 320,
-            total_Lot: 4.25,
-            total_Swap: -12.5,
-            total_OpenPosition: 3,
-          },
-        }),
-      });
-    },
-  );
 }
 
 async function mockRegisteredProfile(page: Page) {

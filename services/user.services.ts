@@ -34,23 +34,6 @@ export type UserDetail = {
   };
 };
 
-export type TradingSummary = {
-  amount: number;
-  currency: string;
-  total_Profit: number;
-  total_Lot: number;
-  total_Swap: number;
-  total_OpenPosition: number;
-}
-
 export function getUserDetail() {
-  return internalApiFetch<UserDetail>(
-    "/api/backend/profile"
-  );
-}
-
-export function getTradingSummary() {
-  return internalApiFetch<TradingSummary>(
-    "/api/backend/Miscellaneous/GetTradingSummary"
-  );
+  return internalApiFetch<UserDetail>("/api/backend/profile");
 }

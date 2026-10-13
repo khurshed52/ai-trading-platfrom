@@ -26,6 +26,24 @@ export interface DashboardNotification {
   tone: "green" | "blue" | "amber";
 }
 
+export interface DashboardSummaryDatum {
+  amount: number;
+  currency: string;
+  totalProfit: number;
+  totalLots: number;
+  totalSwaps: number;
+  totalOpenPositions: number;
+}
+
+export const dashboardSummaryData: DashboardSummaryDatum = {
+  amount: 1250,
+  currency: "USD",
+  totalProfit: 320,
+  totalLots: 4.25,
+  totalSwaps: -12.5,
+  totalOpenPositions: 3,
+};
+
 export const transactionActivityData: TransactionActivityDatum[] = [
   { month: "May", deposits: 3800, withdrawals: 1900, transfers: 1100 },
   { month: "Jun", deposits: 4700, withdrawals: 2700, transfers: 1550 },
