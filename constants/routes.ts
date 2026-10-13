@@ -32,11 +32,14 @@ export const ROUTES = {
 
   REPORTS: {
     ROOT: "/reports",
+    DEPOSIT: "/reports/deposit",
+    WITHDRAWAL: "/reports/withdrawal",
+    TRANSFER: "/reports/transfer",
   },
 
   SETTINGS: {
     ROOT: "/settings",
     PAYMENT_METHOD: "/settings/payment-method",
-    AGREEMENT: "/settings/agreement",
+    ACCOUNT_SECURITY: "/settings/account-security",
   },
 } as const;

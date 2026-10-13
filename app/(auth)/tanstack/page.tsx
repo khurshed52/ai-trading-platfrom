@@ -155,7 +155,8 @@ export default function ProductsTable() {
           </table>
         </div>
 
-        <footer className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50/70 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        {(data?.length ?? 0) > 0 ? (
+          <footer className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50/70 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <label className="flex items-center gap-2 text-sm text-slate-600">
             Rows per page
           <select
@@ -213,7 +214,8 @@ export default function ProductsTable() {
               <ChevronRight aria-hidden="true" size={18} />
             </button>
           </nav>
-        </footer>
+          </footer>
+        ) : null}
       </section>
     </main>
   );

@@ -89,7 +89,7 @@ function Sparkline({
   positive: boolean;
 }) {
   if (values.length < 2) {
-    return <div className="h-10 w-32 rounded bg-zinc-900" />;
+    return <div className="h-10 w-32 rounded bg-slate-100" />;
   }
 
   const width = 130;
@@ -316,19 +316,23 @@ export default function TradingMarketPage() {
   const marketList = SYMBOLS.map((symbol) => markets[symbol]);
 
   return (
-    <main className="min-h-screen bg-black px-4 py-10 text-white md:px-10">
-      <section className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
+    <main className="space-y-8 pb-4 text-slate-800">
+      <MarketNews />
+
+      <section>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Top Markets</h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <h2 className="m-0 text-2xl font-extrabold text-slate-950">
+              Top Markets
+            </h2>
+            <p className="mb-0 mt-1 text-sm text-slate-500">
               Live Binance Spot market data
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm">
             <span
-              className={`h-2.5 w-2.5 rounded-full ${
+              className={`size-2.5 rounded-full ${
                 status === "connected"
                   ? "bg-emerald-500"
                   : status === "connecting"
@@ -337,14 +341,14 @@ export default function TradingMarketPage() {
               }`}
             />
 
-            <span className="capitalize text-zinc-400">{status}</span>
+            <span className="capitalize text-slate-600">{status}</span>
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-950">
+        <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
           <table className="w-full min-w-[1050px] border-collapse">
-            <thead>
-              <tr className="text-left text-sm text-zinc-500">
+            <thead className="bg-slate-50/80">
+              <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-6 py-5 font-medium">Symbol</th>
                 <th className="px-6 py-5 font-medium">Buy Price</th>
                 <th className="px-6 py-5 font-medium">Spread</th>
@@ -364,31 +368,31 @@ export default function TradingMarketPage() {
                 return (
                   <tr
                     key={market.symbol}
-                    className="border-t border-zinc-900"
+                    className="border-t border-slate-100 transition-colors hover:bg-slate-50/70"
                   >
-                    <td className="px-6 py-5 font-semibold">
+                    <td className="px-6 py-5 font-semibold text-slate-950">
                       {market.symbol}
                     </td>
 
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 text-slate-700">
                       {formatPrice(market.bid)}
                     </td>
 
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 text-slate-700">
                       {market.spread
                         ? market.spread.toFixed(4)
                         : "—"}
                     </td>
 
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 text-slate-700">
                       {formatPrice(market.ask)}
                     </td>
 
                     <td
                       className={`px-6 py-5 font-medium ${
                         isPositive
-                          ? "text-emerald-400"
-                          : "text-red-400"
+                          ? "text-emerald-600"
+                          : "text-red-500"
                       }`}
                     >
                       {market.lastPrice
@@ -396,11 +400,11 @@ export default function TradingMarketPage() {
                         : "—"}
                     </td>
 
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 text-slate-700">
                       {formatPrice(market.high)}
                     </td>
 
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 text-slate-700">
                       {formatPrice(market.low)}
                     </td>
 
@@ -414,7 +418,7 @@ export default function TradingMarketPage() {
                     <td className="px-6 py-5">
                       <button
                         type="button"
-                        className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-medium transition hover:border-blue-500 hover:bg-blue-600"
+                        className="rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-semibold text-blue-600 transition hover:border-blue-600 hover:bg-blue-600 hover:text-white"
                       >
                         Trading
                       </button>
@@ -426,8 +430,6 @@ export default function TradingMarketPage() {
           </table>
         </div>
       </section>
-       {/* here is my market news data will come here */}
-       <MarketNews />
     </main>
   );
 }

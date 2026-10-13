@@ -1,5 +1,7 @@
-import { PageTitlePlaceholder } from "@/components/layouts/page-title-placeholder";
+import { redirect } from "next/navigation";
+
+import { ROUTES } from "@/constants/routes";
 
 export default function ReportsPage() {
-  return <PageTitlePlaceholder title="Reports" />;
+  redirect(ROUTES.REPORTS.DEPOSIT);
 }

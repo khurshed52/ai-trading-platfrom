@@ -99,7 +99,8 @@ test("loads and filters funds transactions with POST bodies", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Funds History" })).toBeVisible();
   await expect(page.getByText("DEP-B0F76CAE93974F2F")).toBeVisible();
   await expect(page.getByText("DEP-0D45F4E1BEC24B37")).toBeVisible();
-  await expect(page.getByText("$70.00").first()).toBeVisible();
+  await expect(page.getByText("20.00 USD").first()).toBeVisible();
+  await expect(page.getByText("50.00 USD").first()).toBeVisible();
   expect(requestBodies[0]).toEqual({ page: 1, pageSize: 10, filters: {} });
 
   await page.getByPlaceholder("Search reference...").fill("DEP-B0F");

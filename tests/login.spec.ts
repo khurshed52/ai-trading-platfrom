@@ -42,6 +42,62 @@ async function mockSuccessfulLogin(
       }),
     });
   });
+
+  await page.route("**/api/backend/profile", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        statusCode: 200,
+        message: "Profile fetched successfully",
+        data: {
+          id: "playwright-user",
+          name: "Test Trader",
+          email: credentials.email,
+          role: "USER",
+          isActive: true,
+          status: "APPROVED",
+          permissions: { withdrawalAllowed: true },
+          restrictions: { withdrawalAllowedAt: null },
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          customer: {
+            id: "playwright-customer",
+            customerFirstName: "Test",
+            customerLastName: "Trader",
+            customerNationality: "AE",
+            phoneNumber: "+971500000000",
+            isActive: true,
+            sid: "123456",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        },
+      }),
+    });
+  });
+
+  await page.route(
+    "**/api/backend/Miscellaneous/GetTradingSummary",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          statusCode: 200,
+          message: "Trading summary fetched successfully",
+          data: {
+            amount: 1000,
+            currency: "USD",
+            total_Profit: 100,
+            total_Lot: 2,
+            total_Swap: 0,
+            total_OpenPosition: 1,
+          },
+        }),
+      });
+    },
+  );
 }
 
 test.describe("Login page", () => {
@@ -164,12 +220,21 @@ test.describe("Login page", () => {
   }) => {
     await mockSuccessfulLogin(page, context);
 
+    const loginRequest = page.waitForRequest(LOGIN_URL);
+
     await page.getByLabel("Email Address").fill(credentials.email);
     await page
       .getByLabel("Password", { exact: true })
       .fill(credentials.password);
     await page.getByRole("checkbox", { name: "Remember me" }).check();
     await page.getByRole("button", { name: "Login" }).click();
+
+    const request = await loginRequest;
+    expect(request.postDataJSON()).toEqual({
+      email: credentials.email,
+      password: credentials.password,
+      rememberMe: true,
+    });
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
 
     await expect

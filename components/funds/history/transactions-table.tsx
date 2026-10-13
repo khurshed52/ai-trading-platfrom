@@ -5,11 +5,10 @@ import {
   ClockCircleOutlined,
   CopyOutlined,
   DownloadOutlined,
-  MoreOutlined,
   SwapOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { App, Button, Dropdown, Empty, Pagination, Table, Tag } from "antd";
+import { App, Button, Empty, Pagination, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
 import type {
@@ -69,7 +68,7 @@ export function TransactionsTable({
   loading,
   onPageChange,
 }: TransactionsTableProps) {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
 
   const columns: ColumnsType<FundsTransaction> = [
     {
@@ -181,19 +180,22 @@ export function TransactionsTable({
         scroll={{ x: 1250 }}
         locale={{ emptyText: <Empty description="No transactions found" /> }}
       />
-      <div className="flex flex-col gap-4 border-t border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-sm text-slate-500">
-          Showing {firstItem} to {lastItem} of {pagination.dataCount} transactions
-        </span>
-        <Pagination
-          current={pagination.page}
-          pageSize={pagination.pageSize}
-          total={pagination.dataCount}
-          showSizeChanger
-          pageSizeOptions={[10, 20, 50]}
-          onChange={onPageChange}
-        />
-      </div>
+      {pagination.dataCount > 0 ? (
+        <div className="flex flex-col gap-4 border-t border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-sm text-slate-500">
+            Showing {firstItem} to {lastItem} of {pagination.dataCount}{" "}
+            transactions
+          </span>
+          <Pagination
+            current={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.dataCount}
+            showSizeChanger
+            pageSizeOptions={[10, 20, 50]}
+            onChange={onPageChange}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

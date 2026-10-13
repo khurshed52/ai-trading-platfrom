@@ -9,14 +9,15 @@ import {
   AccountBookOutlined,
   CreditCardOutlined,
   DollarOutlined,
-  FileDoneOutlined,
   FileTextOutlined,
   FundOutlined,
   HistoryOutlined,
   HomeOutlined,
   LockOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
   SwapOutlined,
+  UploadOutlined,
   UserOutlined,
   WalletOutlined,
 } from "@ant-design/icons";
@@ -51,9 +52,12 @@ const navigationKeys = [
   ROUTES.PUBLIC.MARKETS,
   ROUTES.PUBLIC.TRADEPRO_AI,
   ROUTES.PROFILE.ROOT,
+  ROUTES.REPORTS.DEPOSIT,
+  ROUTES.REPORTS.WITHDRAWAL,
+  ROUTES.REPORTS.TRANSFER,
   ROUTES.REPORTS.ROOT,
   ROUTES.SETTINGS.PAYMENT_METHOD,
-  ROUTES.SETTINGS.AGREEMENT,
+  ROUTES.SETTINGS.ACCOUNT_SECURITY,
   ROUTES.SETTINGS.ROOT,
 ];
 
@@ -149,9 +153,11 @@ function SidebarContent({
 }: SidebarContentProps) {
   const selectedParentKey = selectedKey.startsWith("/funds/")
     ? "/funds"
-    : selectedKey.startsWith(ROUTES.SETTINGS.ROOT)
-      ? ROUTES.SETTINGS.ROOT
-      : undefined;
+    : selectedKey.startsWith(`${ROUTES.REPORTS.ROOT}/`)
+      ? ROUTES.REPORTS.ROOT
+      : selectedKey.startsWith(ROUTES.SETTINGS.ROOT)
+        ? ROUTES.SETTINGS.ROOT
+        : undefined;
   const [openKeys, setOpenKeys] = useState<string[]>(
     selectedParentKey ? [selectedParentKey] : [],
   );
@@ -296,8 +302,25 @@ function createNavigationItems({
     {
       key: ROUTES.REPORTS.ROOT,
       icon: <FileTextOutlined />,
-      label: label(ROUTES.REPORTS.ROOT, "Reports", true),
+      label: protectedGroupLabel("Reports"),
       disabled: !hasProtectedAccess,
+      children: [
+        {
+          key: ROUTES.REPORTS.DEPOSIT,
+          icon: <DollarOutlined />,
+          label: label(ROUTES.REPORTS.DEPOSIT, "Deposit", true),
+        },
+        {
+          key: ROUTES.REPORTS.WITHDRAWAL,
+          icon: <UploadOutlined />,
+          label: label(ROUTES.REPORTS.WITHDRAWAL, "Withdrawal", true),
+        },
+        {
+          key: ROUTES.REPORTS.TRANSFER,
+          icon: <SwapOutlined />,
+          label: label(ROUTES.REPORTS.TRANSFER, "Transfer", true),
+        },
+      ],
     },
     {
       key: ROUTES.SETTINGS.ROOT,
@@ -315,9 +338,13 @@ function createNavigationItems({
           ),
         },
         {
-          key: ROUTES.SETTINGS.AGREEMENT,
-          icon: <FileDoneOutlined />,
-          label: label(ROUTES.SETTINGS.AGREEMENT, "Agreement", true),
+          key: ROUTES.SETTINGS.ACCOUNT_SECURITY,
+          icon: <SafetyCertificateOutlined />,
+          label: label(
+            ROUTES.SETTINGS.ACCOUNT_SECURITY,
+            "Account Security",
+            true,
+          ),
         },
       ],
     },

@@ -1,5 +1,7 @@
-import { PageTitlePlaceholder } from "@/components/layouts/page-title-placeholder";
+import { redirect } from "next/navigation";
+
+import { ROUTES } from "@/constants/routes";
 
 export default function AgreementPage() {
-  return <PageTitlePlaceholder title="Agreement" />;
+  redirect(ROUTES.SETTINGS.ACCOUNT_SECURITY);
 }

@@ -7,7 +7,7 @@ export default function MarketNews() {
 
   if (isLoading) {
     return (
-      <div className="mt-10 text-zinc-400">
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 text-sm text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         Loading market news...
       </div>
     );
@@ -15,20 +15,20 @@ export default function MarketNews() {
 
   if (error) {
     return (
-      <div className="mt-10 text-red-400">
+      <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-sm text-red-600">
         Failed to load market news.
       </div>
     );
   }
-   
-  return (
-    <section className="mt-10">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">
-          Market News
-        </h2>
 
-        <p className="mt-1 text-sm text-zinc-500">
+  return (
+    <section>
+      <div className="mb-5">
+        <h1 className="m-0 text-2xl font-extrabold text-slate-950">
+          Market News
+        </h1>
+
+        <p className="mb-0 mt-1 text-sm text-slate-500">
           Latest financial market updates
         </p>
       </div>
@@ -37,7 +37,7 @@ export default function MarketNews() {
         {data?.map((news) => (
           <article
             key={news.uuid}
-            className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950"
+            className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-[0_12px_30px_rgba(15,23,42,0.09)]"
           >
             {news.image_url && (
               // News images come from third-party publishers with dynamic hosts.
@@ -50,7 +50,7 @@ export default function MarketNews() {
             )}
 
             <div className="p-5">
-              <div className="mb-3 flex items-center justify-between text-xs text-zinc-500">
+              <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-500">
                 <span>{news.source}</span>
 
                 <span>
@@ -58,11 +58,11 @@ export default function MarketNews() {
                 </span>
               </div>
 
-              <h3 className="line-clamp-2 text-lg font-semibold">
+              <h3 className="line-clamp-2 text-lg font-semibold text-slate-950">
                 {news.title}
               </h3>
 
-              <p className="mt-3 line-clamp-3 text-sm leading-6 text-zinc-400">
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
                 {news.description || news.snippet}
               </p>
 
@@ -70,7 +70,7 @@ export default function MarketNews() {
                 href={news.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-5 inline-block text-sm font-medium text-blue-400 hover:text-blue-300"
+                className="mt-5 inline-block text-sm font-semibold text-blue-600 hover:text-blue-700"
               >
                 Read more →
               </a>

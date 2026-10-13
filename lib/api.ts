@@ -32,6 +32,49 @@ function isSuccessfulStatus(statusCode: number): boolean {
   return statusCode === 100 || (statusCode >= 200 && statusCode < 300);
 }
 
+type InternalApiResponseShape = "envelope" | "data";
+
+function isApiResponse<T>(value: unknown): value is ApiResponse<T> {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "statusCode" in value &&
+      typeof value.statusCode === "number" &&
+      "data" in value,
+  );
+}
+
+function normalizeInternalResponse<T>(
+  payload: unknown,
+  response: Response,
+  responseShape: InternalApiResponseShape,
+): ApiResponse<T> {
+  if (isApiResponse<T>(payload)) {
+    return payload;
+  }
+
+  if (responseShape === "data") {
+    const payloadMessage =
+      payload &&
+      typeof payload === "object" &&
+      "message" in payload &&
+      typeof payload.message === "string"
+        ? payload.message
+        : undefined;
+
+    return {
+      statusCode: response.status,
+      message:
+        payloadMessage ||
+        response.statusText ||
+        (response.ok ? "Request successful" : "API request failed"),
+      data: payload as T,
+    };
+  }
+
+  return payload as ApiResponse<T>;
+}
+
 async function clearExpiredSession(): Promise<void> {
   if (typeof window === "undefined") {
     return;
@@ -129,7 +172,8 @@ export async function apiFetch<T>(
 
 export async function internalApiFetch<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
+  responseShape: InternalApiResponseShape = "envelope",
 ): Promise<ApiResponse<T>> {
   let response = await fetch(endpoint, {
     ...options,
@@ -140,7 +184,11 @@ export async function internalApiFetch<T>(
     },
   });
 
-  let result = (await response.json()) as ApiResponse<T>;
+  let result = normalizeInternalResponse<T>(
+    await response.json(),
+    response,
+    responseShape,
+  );
 
   const sessionExpired =
     result.statusCode === EXPIRED_SESSION_STATUS_CODE || response.status === 401;
@@ -164,7 +212,11 @@ export async function internalApiFetch<T>(
           ...options?.headers,
         },
       });
-      result = (await response.json()) as ApiResponse<T>;
+      result = normalizeInternalResponse<T>(
+        await response.json(),
+        response,
+        responseShape,
+      );
     } else if (refreshResult === "unauthorized") {
       await clearExpiredSession();
       throw new Error(result.message || "Session expired");
