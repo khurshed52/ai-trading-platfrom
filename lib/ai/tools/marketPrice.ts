@@ -93,10 +93,10 @@ async function getLatestSymbolPrice(
 
 export async function getMarketPrice(
   symbol: string,
+  appOrigin: string,
 ): Promise<MarketPriceResult> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const response = await fetch(`${baseUrl}/api/markets`, {
+  const marketsUrl = new URL("/api/markets", appOrigin);
+  const response = await fetch(marketsUrl, {
     cache: "no-store",
     headers: { Accept: "application/json" },
   });

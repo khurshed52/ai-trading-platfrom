@@ -14,10 +14,11 @@ type MarketNewsApiResponse = {
   data?: MarketNewsItem[];
 };
 
-export async function getLatestMarketNews(): Promise<MarketNewsItem[]> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const response = await fetch(`${baseUrl}/api/market-news?language=en`, {
+export async function getLatestMarketNews(
+  appOrigin: string,
+): Promise<MarketNewsItem[]> {
+  const marketNewsUrl = new URL("/api/market-news?language=en", appOrigin);
+  const response = await fetch(marketNewsUrl, {
     cache: "no-store",
     headers: { Accept: "application/json" },
   });

@@ -617,6 +617,7 @@ function createTextResponse(
 
 export async function POST(request: Request) {
   try {
+    const appOrigin = new URL(request.url).origin;
     const body = (await request.json()) as ChatRequest;
     const file = body.file;
     const historyContents = createHistoryContents(body.history);
@@ -1052,7 +1053,7 @@ guidance is a TradePro product, policy, time frame, fee, limit, or feature.
         authenticatedUser = sessionValidation.user;
       }
 
-      const news = await getLatestMarketNews();
+      const news = await getLatestMarketNews(appOrigin);
       const finalResponse = await ai.models.generateContent({
         model: "gemini-3.1-flash-lite",
         contents: [
@@ -1117,7 +1118,7 @@ Markdown link to the original article. Do not invent stories or details.
       throw new Error("Gemini did not provide a market symbol.");
     }
 
-    const market = await getMarketPrice(args.symbol);
+    const market = await getMarketPrice(args.symbol, appOrigin);
     const finalResponse = await ai.models.generateContent({
       model: "gemini-3.1-flash-lite",
       contents: [
