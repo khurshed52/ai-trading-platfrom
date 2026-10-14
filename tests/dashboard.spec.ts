@@ -20,6 +20,7 @@ async function mockDashboardApis(page: Page) {
           restrictions: { withdrawalAllowedAt: null },
           createdAt: "2026-10-05T17:54:19.434Z",
           updatedAt: "2026-10-05T17:54:19.434Z",
+          lastSeenAt: "2026-10-14T16:41:19.047Z",
           customer: {
             id: "customer-1",
             customerFirstName: "sid",
@@ -31,6 +32,37 @@ async function mockDashboardApis(page: Page) {
             createdAt: "2026-10-05T17:54:19.434Z",
             updatedAt: "2026-10-05T17:54:19.434Z",
           },
+        },
+      }),
+    });
+  });
+
+  await page.route("**/api/backend/notifications/unread-count", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        statusCode: 200,
+        message: "Unread notification count retrieved successfully",
+        data: { unreadCount: 0 },
+      }),
+    });
+  });
+
+  await page.route("**/api/backend/notifications/list", async (route) => {
+    const request = route.request().postDataJSON() as { page: number; pageSize: number };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        statusCode: 200,
+        message: "Notifications retrieved successfully",
+        data: {
+          page: request.page,
+          pageSize: request.pageSize,
+          dataCount: 0,
+          pageCount: 0,
+          pageData: [],
         },
       }),
     });
@@ -93,8 +125,19 @@ test("renders the redesigned dashboard and preserves navigation", async ({
 }) => {
   await page.goto("/dashboard");
 
+  await expect(page.getByText(/Welcome back/)).toHaveCount(0);
+  await expect(page.getByPlaceholder("Search markets, assets...")).toHaveCount(0);
+  const dashboardHeader = page.locator("header.ant-layout-header");
+  await expect(dashboardHeader).toHaveCSS("position", "fixed");
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect
+    .poll(() => dashboardHeader.evaluate((element) => element.getBoundingClientRect().top))
+    .toBe(0);
+
   await expect(page.getByRole("heading", { name: "sid test" })).toBeVisible();
   await expect(page.getByText("SID: 623729")).toBeVisible();
+  await expect(page.getByText(/Created: Oct 5, 2026/)).toBeVisible();
+  await expect(page.getByText(/Last seen: Oct 14, 2026/)).toBeVisible();
   await expect(page.getByText("$1,250.00")).toBeVisible();
   const summaryCards = page.getByRole("region", { name: "Trading summary" }).locator("article");
   await expect(summaryCards).toHaveCount(5);

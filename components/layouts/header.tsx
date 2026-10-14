@@ -5,35 +5,31 @@ import { ROUTES } from "@/constants/routes";
 import { useLogout } from "@/hooks/useAuth";
 import {
   Avatar,
-  Badge,
   Button,
   Dropdown,
-  Input,
   Layout,
-  Typography,
 } from "antd";
 import type { MenuProps } from "antd";
 import {
-  BellOutlined,
   DownOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuOutlined,
   MenuUnfoldOutlined,
-  SearchOutlined,
   SettingOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 
 const { Header } = Layout;
-const { Text, Title } = Typography;
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   beginAuthLogout,
   notifyAuthLogout,
 } from "@/lib/auth-events";
 import { useUserDetail } from "@/hooks/useUser";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { notificationKeys } from "@/hooks/useNotifications";
 
 type DashboardHeaderProps = {
   collapsed: boolean;
@@ -69,14 +65,10 @@ export default function DashboardHeader({
   onOpenMobileMenu,
 }: DashboardHeaderProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const queryClient = useQueryClient();
   const { isPending: isLoggingOut, mutate: logout } = useLogout();
   const { data: userData } = useUserDetail();
   const user = userData?.data;
-  const firstName =
-    user?.customer?.customerFirstName?.trim() ||
-    user?.customer_FirstName?.trim();
   const fullName = [
     user?.customer?.customerFirstName || user?.customer_FirstName,
     user?.customer_MiddleName,
@@ -85,9 +77,6 @@ export default function DashboardHeader({
     .map((namePart) => namePart?.trim())
     .filter(Boolean)
     .join(" ");
-  const isProfilePage = pathname === ROUTES.PROFILE.ROOT;
-  const isTradeProAiPage = pathname === ROUTES.PUBLIC.TRADEPRO_AI;
-
   function handleProfileMenuClick({
     key,
   }: {
@@ -99,6 +88,7 @@ export default function DashboardHeader({
 
       logout(undefined, {
         onSettled: () => {
+          queryClient.removeQueries({ queryKey: notificationKeys.all });
           notifyAuthLogout();
           router.replace(ROUTES.AUTH.LOGIN);
         },
@@ -108,7 +98,9 @@ export default function DashboardHeader({
 
   return (
     <Header
-      className="!sticky !top-0 !z-40 !flex !h-[76px] !items-center !border-b !border-slate-200/80 !bg-white/95 !px-4 !leading-normal backdrop-blur-xl sm:!px-6 lg:!px-7"
+      className={`!fixed !inset-x-0 !top-0 !z-40 !flex !h-[76px] !items-center !border-b !border-slate-200/80 !bg-white/95 !px-4 !leading-normal backdrop-blur-xl sm:!px-6 lg:!px-7 ${
+        collapsed ? "lg:!left-[88px]" : "lg:!left-[252px]"
+      }`}
       style={{
         boxShadow: "0 5px 25px rgba(15, 23, 42, 0.04)",
       }}
@@ -140,47 +132,10 @@ export default function DashboardHeader({
           className="!inline-flex !size-11 !items-center !justify-center !rounded-xl !bg-slate-50 !text-lg !text-slate-700 lg:!hidden"
         />
 
-        <div className="min-w-0 flex-1">
-          <Title
-            level={4}
-            className="!mb-0 !truncate !text-[16px] !font-bold !text-slate-950 sm:!text-[18px]"
-          >
-            {isProfilePage
-              ? "Profile"
-              : `Welcome back${firstName ? `, ${firstName}` : ""} 👋`}
-          </Title>
-
-          <Text className="!hidden !text-xs !text-slate-500 sm:!block">
-            {isProfilePage
-              ? "View your personal information and account status."
-              : isTradeProAiPage
-                ? "Your AI companion is here to help you trade smarter."
-                : "Here's what's happening with your portfolio today."}
-          </Text>
-        </div>
+        <div className="flex-1" />
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <Input
-            allowClear
-            prefix={
-              <SearchOutlined className="text-slate-400" />
-            }
-            placeholder={
-              isTradeProAiPage
-                ? "Search accounts, transactions, or ask AI..."
-                : "Search markets, assets..."
-            }
-            className="!hidden !h-11 !w-[250px] !rounded-xl !border-slate-200 xl:!flex"
-          />
-
-          <Badge count={3} size="small">
-            <Button
-              type="text"
-              aria-label="Notifications"
-              icon={<BellOutlined />}
-              className="!inline-flex !size-11 !items-center !justify-center !rounded-xl !bg-slate-50 !text-lg !text-slate-700"
-            />
-          </Badge>
+          <NotificationBell />
 
           <Dropdown
             menu={{

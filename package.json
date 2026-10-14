@@ -10,6 +10,7 @@
     "test:login": "playwright test tests/login.spec.ts --project=chromium",
     "test:login:headed": "playwright test tests/login.spec.ts --project=chromium --headed",
     "test:transfer": "playwright test tests/transfer.spec.ts --project=chromium",
+    "test:notifications": "playwright test tests/notifications.spec.ts --project=chromium",
     "test:profile": "playwright test tests/profile-routing.spec.ts --project=chromium"
   },
   "dependencies": {

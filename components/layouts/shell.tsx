@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Layout, Spin } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ROUTES } from "@/constants/routes";
 import { useUserDetail } from "@/hooks/useUser";
 import { AUTH_SESSION_EXPIRED_EVENT } from "@/lib/auth-events";
+import { notificationKeys } from "@/hooks/useNotifications";
 import { canAccessKycProtectedRoutes, isKycStatus } from "@/lib/kyc";
 import DashboardHeader from "./header";
 import DashboardSidebar from "./sidebar";
@@ -36,6 +37,7 @@ export default function DashboardShell({
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const userQuery = useUserDetail();
+  const previousUserIdRef = useRef<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const rawKycStatus = userQuery.data?.data.status;
@@ -52,8 +54,22 @@ export default function DashboardShell({
     isProtectedRoute && !userQuery.isLoading && !hasProtectedAccess;
 
   useEffect(() => {
+    const currentUserId = userQuery.data?.data.id ?? null;
+    const previousUserId = previousUserIdRef.current;
+
+    if (previousUserId && currentUserId && previousUserId !== currentUserId) {
+      queryClient.removeQueries({
+        queryKey: notificationKeys.user(previousUserId),
+      });
+    }
+
+    previousUserIdRef.current = currentUserId;
+  }, [queryClient, userQuery.data?.data.id]);
+
+  useEffect(() => {
     function redirectToLogin() {
       void queryClient.cancelQueries();
+      queryClient.removeQueries({ queryKey: notificationKeys.all });
       router.replace(ROUTES.AUTH.LOGIN);
     }
 
@@ -103,7 +119,7 @@ export default function DashboardShell({
           }}
         />
 
-        <Content className="!min-h-[calc(100vh-76px)] !min-w-0 !overflow-x-hidden !bg-[#f4f7fb]">
+        <Content className="!min-h-screen !min-w-0 !overflow-x-hidden !bg-[#f4f7fb] !pt-[76px]">
           <main className="w-full min-w-0 p-4 sm:p-6 lg:p-5">
             <div className="w-full min-w-0">
               {isCheckingProtectedAccess || shouldRedirectFromProtectedRoute ? (

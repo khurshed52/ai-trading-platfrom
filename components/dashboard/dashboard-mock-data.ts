@@ -17,15 +17,6 @@ export interface AccountBalanceDatum {
   balance: number;
 }
 
-export interface DashboardNotification {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  tone: "green" | "blue" | "amber";
-}
-
 export interface DashboardSummaryDatum {
   amount: number;
   currency: string;
@@ -64,31 +55,4 @@ export const accountBalanceData: AccountBalanceDatum[] = [
   { account: "33587952", currency: "USD", balance: 5400 },
   { account: "44587953", currency: "EUR", balance: 3200 },
   { account: "55687954", currency: "USD", balance: 3850 },
-];
-
-export const dashboardNotifications: DashboardNotification[] = [
-  {
-    id: "withdrawal-1",
-    title: "Your withdrawal request is being processed.",
-    description: "We will notify you once it is complete.",
-    date: "13/07/2026",
-    time: "10:30 AM",
-    tone: "green",
-  },
-  {
-    id: "withdrawal-2",
-    title: "Your withdrawal request is being processed.",
-    description: "We will notify you once it is complete.",
-    date: "21/06/2026",
-    time: "09:15 AM",
-    tone: "blue",
-  },
-  {
-    id: "withdrawal-3",
-    title: "Your withdrawal request is being processed.",
-    description: "We will notify you once it is complete.",
-    date: "15/06/2026",
-    time: "11:45 AM",
-    tone: "amber",
-  },
 ];

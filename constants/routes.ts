@@ -30,6 +30,8 @@ export const ROUTES = {
     KYC: "/profile/kyc",
   },
 
+  NOTIFICATIONS: "/notifications",
+
   REPORTS: {
     ROOT: "/reports",
     DEPOSIT: "/reports/deposit",

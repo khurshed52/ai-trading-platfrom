@@ -76,6 +76,8 @@ type DirectAccountIntent =
   | "open_positions"
   | "email"
   | "sid"
+  | "kyc_status"
+  | "open_account"
   | "trading_summary";
 
 type DirectFundsIntent =
@@ -305,6 +307,18 @@ function continuesRestrictedNewsRequest(
 
 function getDirectAccountIntent(message: string): DirectAccountIntent | null {
   const normalizedMessage = message.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  const asksToOpenAccount =
+    /\b(?:how|where) (?:can|do) i (?:create|open) (?:an? )?(?:new )?(?:trading )?account\b/.test(
+      normalizedMessage,
+    ) ||
+    /\b(?:create|open) (?:an? )?(?:new )?(?:trading )?account\b/.test(
+      normalizedMessage,
+    );
+
+  if (asksToOpenAccount) {
+    return "open_account";
+  }
+
   const isPersonal =
     /\b(?:my|mine)\b/.test(normalizedMessage) ||
     /\bdo i have\b/.test(normalizedMessage);
@@ -315,6 +329,14 @@ function getDirectAccountIntent(message: string): DirectAccountIntent | null {
 
   if (/\b(?:complete|full) trading summary\b/.test(normalizedMessage)) {
     return "trading_summary";
+  }
+
+  if (
+    /\b(?:kyc|verification|identity verification|verified)\b/.test(
+      normalizedMessage,
+    )
+  ) {
+    return "kyc_status";
   }
 
   if (/\b(?:email|email address)\b/.test(normalizedMessage)) {
@@ -361,12 +383,21 @@ function getDirectFundsIntent(message: string): DirectFundsIntent | null {
     /\b(?:all|check|give|history|recent|show|status|transactions?)\b/.test(
       normalizedMessage,
     );
+  const asksForDepositNavigation =
+    isDeposit &&
+    /\b(?:page|find|open|access|navigate|where|unable|cannot|can t|go)\b/.test(
+      normalizedMessage,
+    );
 
   if (
     /\btransactions?\b/.test(normalizedMessage) &&
     /\b(?:all|history|my|recent|show)\b/.test(normalizedMessage)
   ) {
     return "transaction_history";
+  }
+
+  if (asksForDepositNavigation) {
+    return null;
   }
 
   if (isDeposit && (isPersonal || asksForRecords)) {
@@ -461,18 +492,50 @@ async function validateAccessToken(
 }
 
 function createUserDetailAnswer(
-  intent: "email" | "sid",
+  intent: "email" | "sid" | "kyc_status" | "open_account",
   user: UserDetail,
 ): string {
   if (intent === "email") {
     return `Your registered email address is **${user.email || user.user_Email}**.`;
   }
 
-  return `Your customer SID is **${user.customer?.sid || user.customer_SID}**.`;
+  if (intent === "sid") {
+    return `Your customer SID is **${user.customer?.sid || user.customer_SID}**.`;
+  }
+
+  const status = (user.status || user.customer_Status || "UNKNOWN")
+    .trim()
+    .toUpperCase();
+  const statusLabel = status.replaceAll("_", " ");
+
+  if (intent === "kyc_status") {
+    if (status === "APPROVED") {
+      return `Your KYC status is **APPROVED**. Your identity verification and customer profile are approved. [View your verified profile](${ROUTES.PROFILE.ROOT}).`;
+    }
+
+    if (status === "COMPLETED") {
+      return `Your KYC status is **COMPLETED**. Your verification has been submitted and is awaiting final approval. [View your KYC status](${ROUTES.PROFILE.KYC}).`;
+    }
+
+    return `Your current KYC status is **${statusLabel}**. [View your KYC progress](${ROUTES.PROFILE.KYC}).`;
+  }
+
+  if (status === "APPROVED") {
+    return `Your profile status is **APPROVED**, so your KYC is complete. You can create a new MT4 or MT5 trading account from the Accounts page: [Open Trading Accounts](${ROUTES.ACCOUNTS.ROOT}).`;
+  }
+
+  if (status === "COMPLETED") {
+    return `Your KYC is **COMPLETED** and awaiting final approval. You can create a trading account from the Accounts page after your profile status becomes **APPROVED**. [View your KYC status](${ROUTES.PROFILE.KYC}).`;
+  }
+
+  return `Your current profile status is **${statusLabel}**. Complete the remaining verification steps and wait for approval before creating a trading account. [Continue KYC](${ROUTES.PROFILE.KYC}).`;
 }
 
 function createTradingSummaryAnswer(
-  intent: Exclude<DirectAccountIntent, "email" | "sid">,
+  intent: Exclude<
+    DirectAccountIntent,
+    "email" | "sid" | "kyc_status" | "open_account"
+  >,
   accounts: Awaited<ReturnType<typeof getTradingSummary>>,
   requestedAccountNumber?: string,
 ): string {
@@ -640,7 +703,7 @@ export async function POST(request: Request) {
     const accessToken = cookieStore.get("access_token")?.value;
     const directAccountIntent = getDirectAccountIntent(message);
     const directFundsIntent = getDirectFundsIntent(message);
-    const directTradeProAnswer = file || directFundsIntent
+    const directTradeProAnswer = file || directFundsIntent || directAccountIntent
       ? null
       : getDirectTradeProAnswer(message);
     const privacyPolicyQuestion = !file && isPrivacyPolicyQuestion(message);
@@ -771,7 +834,12 @@ export async function POST(request: Request) {
     }
 
     if (directAccountIntent && accessToken && authenticatedUser) {
-      if (directAccountIntent === "email" || directAccountIntent === "sid") {
+      if (
+        directAccountIntent === "email" ||
+        directAccountIntent === "sid" ||
+        directAccountIntent === "kyc_status" ||
+        directAccountIntent === "open_account"
+      ) {
         return createTextResponse(
           createUserDetailAnswer(directAccountIntent, authenticatedUser),
           {
@@ -924,7 +992,9 @@ export async function POST(request: Request) {
       const summaryIntent =
         directAccountIntent &&
         directAccountIntent !== "email" &&
-        directAccountIntent !== "sid"
+        directAccountIntent !== "sid" &&
+        directAccountIntent !== "kyc_status" &&
+        directAccountIntent !== "open_account"
           ? directAccountIntent
           : "trading_summary";
 

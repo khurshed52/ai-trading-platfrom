@@ -2,6 +2,9 @@ import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   BarChartOutlined,
+  CalendarOutlined,
+  ClockCircleOutlined,
+  IdcardOutlined,
   LockOutlined,
   PlusOutlined,
   UserOutlined,
@@ -52,10 +55,23 @@ const quickActions = [
   },
 ] as const;
 
-function formatJoinedDate(createdAt?: string) {
-  if (!createdAt) return "—";
-  const date = new Date(createdAt);
-  return Number.isNaN(date.getTime()) ? createdAt : date.toISOString();
+function formatProfileDate(value?: string | null, includeTime = false) {
+  if (!value) return "—";
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...(includeTime
+      ? {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      : {}),
+  }).format(date);
 }
 
 function HeroIllustration() {
@@ -148,10 +164,19 @@ export function DashboardHero({ user, isLoading }: DashboardHeroProps) {
                   {rawKycStatus || "PENDING"}
                 </span>
               </div>
-              <p className="mt-1.5 break-words text-xs text-slate-600">
-                SID: {user?.customer?.sid || "—"}
-                <span className="mx-2 text-slate-400">|</span>
-                {formatJoinedDate(user?.customer?.createdAt)}
+              <div className="mt-2 mb-1 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-bold text-slate-700">
+                <span className="inline-flex items-center gap-1.5">
+                  <IdcardOutlined className="text-blue-600" />
+                  SID: {user?.customer?.sid || "—"}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarOutlined className="text-blue-600" />
+                  Created: {formatProfileDate(user?.createdAt)}
+                </span>
+              </div>
+              <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <ClockCircleOutlined className="text-blue-600" />
+                Last seen: {formatProfileDate(user?.lastSeenAt, true)}
               </p>
             </div>
           )}

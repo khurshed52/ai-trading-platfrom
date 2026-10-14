@@ -15,6 +15,7 @@ export type UserDetail = {
   };
   createdAt: string;
   updatedAt: string;
+  lastSeenAt?: string | null;
   customer_FirstName?: string;
   customer_MiddleName?: string;
   customer_LastName?: string;

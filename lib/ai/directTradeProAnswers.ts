@@ -25,6 +25,16 @@ function getDepositMethodsAnswer(): string {
   ].join("\n");
 }
 
+function getDepositNavigationAnswer(): string {
+  return [
+    "You can make a deposit from the **Deposit Funds** page:",
+    "",
+    `[Open Deposit Funds](${ROUTES.FUNDS.DEPOSIT}).`,
+    "",
+    "Select the trading account, choose an available deposit method, enter the amount, and follow the payment instructions.",
+  ].join("\n");
+}
+
 function getWithdrawalInstructions(): string {
   const availableBalance = tradeproKnowledge.withdrawals.facts.find(
     ({ topic }) => topic === "availableBalance",
@@ -131,6 +141,15 @@ function getSupportAnswer(): string | null {
 
 export function getDirectTradeProAnswer(message: string): string | null {
   const question = normalizeQuestion(message);
+
+  if (
+    /\bdeposits?\b/.test(question) &&
+    /\b(?:page|find|open|access|navigate|where|unable|cannot|can t|go)\b/.test(
+      question,
+    )
+  ) {
+    return getDepositNavigationAnswer();
+  }
 
   if (
     /\bctrader\b/.test(question) &&
