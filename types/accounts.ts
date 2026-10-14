@@ -8,6 +8,7 @@ export type TradingAccount = {
   platform: TradingPlatform;
   currency: TradingCurrency;
   balance: string;
+  availableBalance?: string;
   status: string;
   createdAt?: string;
   updatedAt?: string;

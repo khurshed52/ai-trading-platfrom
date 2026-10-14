@@ -26,6 +26,7 @@ const accountsResponse = {
       platform: "MT5",
       currency: "USD",
       balance: "500",
+      availableBalance: "20.00",
       status: "ACTIVE",
     },
     {
@@ -34,6 +35,7 @@ const accountsResponse = {
       platform: "MT4",
       currency: "USD",
       balance: "250",
+      availableBalance: "75.00",
       status: "ACTIVE",
     },
     {
@@ -42,9 +44,17 @@ const accountsResponse = {
       platform: "MT5",
       currency: "USD",
       balance: "100",
+      availableBalance: "100.00",
       status: "INACTIVE",
     },
   ],
+};
+
+type AccountFixture = Omit<
+  (typeof accountsResponse.data)[number],
+  "availableBalance"
+> & {
+  availableBalance?: string;
 };
 
 function successResponse(accountNumber = "33587952", amount = "20") {
@@ -70,7 +80,11 @@ function successResponse(accountNumber = "33587952", amount = "20") {
   };
 }
 
-async function openWithdrawalPage(page: Page) {
+async function openWithdrawalPage(
+  page: Page,
+  accountData: AccountFixture[] = accountsResponse.data,
+  onAccountsRequest?: (route: Route) => void,
+) {
   await page.context().addCookies([
     {
       name: "access_token",
@@ -83,9 +97,22 @@ async function openWithdrawalPage(page: Page) {
   await page.route("**/api/backend/profile", (route) =>
     route.fulfill({ status: 200, json: profileResponse }),
   );
-  await page.route("**/api/backend/accounts/all", (route) =>
-    route.fulfill({ status: 200, json: accountsResponse }),
-  );
+  await page.route("**/api/backend/accounts/getAccounts", (route) => {
+    onAccountsRequest?.(route);
+    return route.fulfill({
+      status: 200,
+      json: {
+        ...accountsResponse,
+        data: {
+          page: 1,
+          pageSize: 100,
+          dataCount: accountData.length,
+          pageCount: 1,
+          pageData: accountData,
+        },
+      },
+    });
+  });
   await page.route("**/api/backend/funds/exchange-rate", async (route) => {
     const request = route.request().postDataJSON() as { toCurrency: string };
     const rate = request.toCurrency === "INR" ? "96.63" : "1";
@@ -124,7 +151,16 @@ function assertUuid(value: string | undefined) {
 
 test("loads active accounts and submits one idempotent withdrawal", async ({ page }) => {
   const requests: Array<{ body: unknown; key?: string }> = [];
-  await openWithdrawalPage(page);
+  let accountsRequestCount = 0;
+  await openWithdrawalPage(page, accountsResponse.data, (route) => {
+    accountsRequestCount += 1;
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toEqual({
+      page: 1,
+      pageSize: 100,
+      filters: {},
+    });
+  });
   await expect(page.getByText("Choose Withdrawal Method")).toHaveCount(0);
   await expect(page.getByText("99999999")).toHaveCount(0);
 
@@ -150,7 +186,16 @@ test("loads active accounts and submits one idempotent withdrawal", async ({ pag
     payoutCurrency: "USD",
   });
   assertUuid(requests[0].key);
-  await expect(page.getByText("Reported balance: 500.00 USD")).toBeVisible();
+  await expect(page.getByText("Reported balance: 500.00 USD")).toHaveCount(0);
+  await expect(page.getByText("Available to Withdraw")).toHaveCount(2);
+  await expect(
+    page
+      .getByText("Available to Withdraw")
+      .first()
+      .locator("..")
+      .getByText("20.00 USD", { exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => accountsRequestCount).toBeGreaterThan(1);
 });
 
 test("account and payout currency changes update requests and conversion", async ({ page }) => {
@@ -186,6 +231,7 @@ test("account and payout currency changes update requests and conversion", async
 
   await page.locator(".ant-select").first().click();
   await page.getByText("MT4 · 74077141 · USD").click();
+  await expect(page.getByText("75.00 USD")).toHaveCount(2);
   await page.getByLabel("Payout currency").click();
   await page.getByText("INR", { exact: true }).last().click();
   await expect(page.getByText("1 USD = 96.63 INR").first()).toBeVisible();
@@ -204,6 +250,51 @@ test("account and payout currency changes update requests and conversion", async
     amount: 20,
     payoutCurrency: "INR",
   });
+});
+
+test("blocks amounts above the selected account's available balance", async ({
+  page,
+}) => {
+  let withdrawalRequestCount = 0;
+  await openWithdrawalPage(page);
+  await page.route("**/api/backend/funds/withdraw", (route) => {
+    withdrawalRequestCount += 1;
+    return route.fulfill({ status: 201, json: successResponse() });
+  });
+
+  await page.getByLabel("Account deduction (USD)").fill("20.01");
+
+  await expect(
+    page.getByText("Amount exceeds available balance (20.00 USD)."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Withdraw Funds" }),
+  ).toBeDisabled();
+  expect(withdrawalRequestCount).toBe(0);
+});
+
+test("does not fall back to total balance when available balance is missing", async ({
+  page,
+}) => {
+  const accountsWithoutAvailableBalance = accountsResponse.data.map(
+    (account) => {
+      const accountWithoutAvailableBalance: AccountFixture = { ...account };
+      delete accountWithoutAvailableBalance.availableBalance;
+      return accountWithoutAvailableBalance;
+    },
+  );
+  await openWithdrawalPage(page, accountsWithoutAvailableBalance);
+
+  await expect(page.getByText("Unavailable")).toHaveCount(2);
+  await page.getByLabel("Account deduction (USD)").fill("1");
+  await expect(
+    page.getByText(
+      "Available balance is unavailable. Please refresh and try again.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Withdraw Funds" }),
+  ).toBeDisabled();
 });
 
 test("retry after an uncertain result preserves the key and body", async ({ page }) => {

@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { DollarOutlined, DownOutlined, LockOutlined } from "@ant-design/icons";
+import { useEffect, useMemo, useState } from "react";
+import {
+  DollarOutlined,
+  DownOutlined,
+  LockOutlined,
+  WalletOutlined,
+} from "@ant-design/icons";
 import {
   Alert,
   Button,
@@ -20,7 +25,7 @@ import type { FormProps } from "antd";
 import { useRouter } from "next/navigation";
 
 import { ROUTES } from "@/constants/routes";
-import { useAllTradingAccounts } from "@/hooks/useAccounts";
+import { useTradingAccounts } from "@/hooks/useAccounts";
 import { useDepositExchangeRate } from "@/hooks/useDeposit";
 import { useUserDetail } from "@/hooks/useUser";
 import { useWithdrawalFlow } from "@/hooks/useWithdrawalFlow";
@@ -42,6 +47,12 @@ const currencyOptions: Array<{ label: CurrencyCode; value: CurrencyCode }> = [
   { label: "INR", value: "INR" },
 ];
 
+const withdrawalAccountsParams = {
+  page: 1,
+  pageSize: 100,
+  filters: {},
+} as const;
+
 function formatMoney(value: number | string, currency: string) {
   const amount = Number(value);
   const formatted = Number.isFinite(amount)
@@ -58,10 +69,17 @@ function parseRate(value: string | undefined) {
   return Number.isFinite(rate) && rate > 0 ? rate : undefined;
 }
 
+function parseAvailableBalance(value: unknown) {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : undefined;
+}
+
 export default function WithdrawalForm() {
   const router = useRouter();
   const [form] = Form.useForm<WithdrawalFormValues>();
-  const accountsQuery = useAllTradingAccounts();
+  const accountsQuery = useTradingAccounts(withdrawalAccountsParams);
   const userQuery = useUserDetail();
   const withdrawal = useWithdrawalFlow(userQuery.data?.data.id);
   const [selectedAccountNumber, setSelectedAccountNumber] = useState("");
@@ -70,7 +88,7 @@ export default function WithdrawalForm() {
 
   const accounts = useMemo(
     () =>
-      (accountsQuery.data?.data ?? []).filter(
+      (accountsQuery.data?.data.pageData ?? []).filter(
         (account) => account.status.trim().toUpperCase() === "ACTIVE",
       ),
     [accountsQuery.data?.data],
@@ -79,6 +97,9 @@ export default function WithdrawalForm() {
     accounts.find(
       (account) => account.accountNumber === selectedAccountNumber,
     ) ?? accounts[0];
+  const availableBalance = parseAvailableBalance(
+    selectedAccount?.availableBalance,
+  );
 
   const exchangeRateQuery = useDepositExchangeRate({
     fromCurrency: "USD",
@@ -88,11 +109,29 @@ export default function WithdrawalForm() {
   const exchangeRate = parseRate(exchangeRateQuery.data?.data.exchangeRate);
   const payoutAmount =
     amount > 0 && exchangeRate !== undefined ? amount * exchangeRate : undefined;
+  const isAmountInvalid =
+    !Number.isFinite(amount) ||
+    amount <= 0 ||
+    availableBalance === undefined ||
+    amount > availableBalance;
+
+  useEffect(() => {
+    if (form.isFieldTouched("amount")) {
+      void form.validateFields(["amount"]);
+    }
+  }, [availableBalance, form, selectedAccount?.accountNumber]);
 
   const handleSubmit: FormProps<WithdrawalFormValues>["onFinish"] = (
     values,
   ) => {
-    if (!selectedAccount || exchangeRate === undefined) return;
+    if (
+      !selectedAccount ||
+      exchangeRate === undefined ||
+      availableBalance === undefined ||
+      values.amount > availableBalance
+    ) {
+      return;
+    }
     withdrawal.start({
       accountNumber: selectedAccount.accountNumber,
       amount: values.amount,
@@ -159,9 +198,24 @@ export default function WithdrawalForm() {
                 />
               </Form.Item>
               {selectedAccount ? (
-                <p className="mb-0 mt-2 text-xs text-slate-500">
-                  Reported balance: {formatMoney(selectedAccount.balance, selectedAccount.currency)}
-                </p>
+                <div className="mt-3 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2.5">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-lg text-emerald-600">
+                    <WalletOutlined />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="m-0 text-xs font-medium text-slate-500">
+                      Available to Withdraw
+                    </p>
+                    <p className="m-0 mt-0.5 text-lg font-bold text-emerald-600">
+                      {availableBalance === undefined
+                        ? "Unavailable"
+                        : formatMoney(
+                            availableBalance,
+                            selectedAccount.currency,
+                          )}
+                    </p>
+                  </div>
+                </div>
               ) : null}
             </SectionCard>
 
@@ -206,6 +260,36 @@ export default function WithdrawalForm() {
                               new Error("A valid exchange rate is required"),
                             )
                           : Promise.resolve(),
+                    },
+                    {
+                      validator: (_, value) => {
+                        if (
+                          typeof value !== "number" ||
+                          !Number.isFinite(value) ||
+                          value <= 0
+                        ) {
+                          return Promise.resolve();
+                        }
+
+                        if (availableBalance === undefined) {
+                          return Promise.reject(
+                            new Error(
+                              "Available balance is unavailable. Please refresh and try again.",
+                            ),
+                          );
+                        }
+
+                        return value > availableBalance
+                          ? Promise.reject(
+                              new Error(
+                                `Amount exceeds available balance (${formatMoney(
+                                  availableBalance,
+                                  selectedAccount.currency,
+                                )}).`,
+                              ),
+                            )
+                          : Promise.resolve();
+                      },
                     },
                   ]}
                 >
@@ -279,7 +363,8 @@ export default function WithdrawalForm() {
                 Boolean(withdrawal.recoverableAttempt) ||
                 exchangeRateQuery.isLoading ||
                 exchangeRateQuery.isError ||
-                exchangeRate === undefined
+                exchangeRate === undefined ||
+                isAmountInvalid
               }
               className="!h-14 !rounded-xl !text-base !font-semibold"
             >
@@ -408,6 +493,8 @@ function WithdrawalSummary({
   payoutCurrency: CurrencyCode;
   exchangeRate?: number;
 }) {
+  const availableBalance = parseAvailableBalance(account.availableBalance);
+
   return (
     <Card
       bordered={false}
@@ -426,6 +513,14 @@ function WithdrawalSummary({
         <SummaryRow
           label="Trading Account"
           value={`${account.platform} · ${account.accountNumber} · ${account.currency}`}
+        />
+        <SummaryRow
+          label="Available to Withdraw"
+          value={
+            availableBalance === undefined
+              ? "Unavailable"
+              : formatMoney(availableBalance, account.currency)
+          }
         />
         <SummaryDivider />
         <SummaryRow

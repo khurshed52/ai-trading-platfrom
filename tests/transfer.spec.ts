@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 const profileResponse = {
   statusCode: 200,
@@ -26,6 +26,7 @@ const accountsResponse = {
       platform: "MT5",
       currency: "USD",
       balance: "45",
+      availableBalance: "20.00",
       status: "ACTIVE",
     },
     {
@@ -34,6 +35,7 @@ const accountsResponse = {
       platform: "MT4",
       currency: "EUR",
       balance: "25",
+      availableBalance: "15.00",
       status: "ACTIVE",
     },
     {
@@ -42,9 +44,17 @@ const accountsResponse = {
       platform: "MT5",
       currency: "USD",
       balance: "100",
+      availableBalance: "100.00",
       status: "INACTIVE",
     },
   ],
+};
+
+type AccountFixture = Omit<
+  (typeof accountsResponse.data)[number],
+  "availableBalance"
+> & {
+  availableBalance?: string;
 };
 
 function transferResponse() {
@@ -77,7 +87,11 @@ function transferResponse() {
   };
 }
 
-async function openTransferPage(page: Page) {
+async function openTransferPage(
+  page: Page,
+  accountData: AccountFixture[] = accountsResponse.data,
+  onAccountsRequest?: (route: Route) => void,
+) {
   await page.context().addCookies([
     {
       name: "access_token",
@@ -90,9 +104,22 @@ async function openTransferPage(page: Page) {
   await page.route("**/api/backend/profile", (route) =>
     route.fulfill({ status: 200, json: profileResponse }),
   );
-  await page.route("**/api/backend/accounts/all", (route) =>
-    route.fulfill({ status: 200, json: accountsResponse }),
-  );
+  await page.route("**/api/backend/accounts/getAccounts", (route) => {
+    onAccountsRequest?.(route);
+    return route.fulfill({
+      status: 200,
+      json: {
+        ...accountsResponse,
+        data: {
+          page: 1,
+          pageSize: 100,
+          dataCount: accountData.length,
+          pageCount: 1,
+          pageData: accountData,
+        },
+      },
+    });
+  });
   await page.route("**/api/backend/funds/exchange-rate", async (route) => {
     const body = route.request().postDataJSON() as {
       fromCurrency: string;
@@ -133,7 +160,16 @@ async function submitAmount(page: Page, amount: string) {
 
 test("submits a transfer once with runtime accounts and a UUID", async ({ page }) => {
   const requests: Array<{ body: unknown; key?: string }> = [];
-  await openTransferPage(page);
+  let accountsRequestCount = 0;
+  await openTransferPage(page, accountsResponse.data, (route) => {
+    accountsRequestCount += 1;
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toEqual({
+      page: 1,
+      pageSize: 100,
+      filters: {},
+    });
+  });
   await expect(page.getByText("99999999")).toHaveCount(0);
   await page.route("**/api/backend/funds/transfer", async (route) => {
     requests.push({
@@ -155,7 +191,16 @@ test("submits a transfer once with runtime accounts and a UUID", async ({ page }
     amount: 5,
   });
   assertUuid(requests[0].key);
-  await expect(page.getByText("Reported balance: 45.00 USD")).toBeVisible();
+  await expect(page.getByText("Reported balance: 45.00 USD")).toHaveCount(0);
+  await expect(page.getByText("Available to Transfer")).toHaveCount(2);
+  await expect(
+    page
+      .getByText("Available to Transfer")
+      .first()
+      .locator("..")
+      .getByText("20.00 USD", { exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => accountsRequestCount).toBeGreaterThan(1);
 });
 
 test("swapping accounts requests the reverse exchange rate", async ({ page }) => {
@@ -184,8 +229,15 @@ test("swapping accounts requests the reverse exchange rate", async ({ page }) =>
     });
   });
 
+  await page.getByLabel("Transfer amount (USD)").fill("18");
   await page.getByRole("button", { name: "Swap transfer accounts" }).click();
   await expect(page.getByText("1 EUR = 1.11111111 USD").first()).toBeVisible();
+  await expect(
+    page.getByText("Amount exceeds available balance (15.00 EUR)."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Transfer Funds" }),
+  ).toBeDisabled();
   expect(rateBodies.at(-1)).toEqual({
     fromCurrency: "EUR",
     toCurrency: "USD",
@@ -193,7 +245,7 @@ test("swapping accounts requests the reverse exchange rate", async ({ page }) =>
   });
 });
 
-test("validates the reported source balance before submitting", async ({ page }) => {
+test("validates the available source balance before submitting", async ({ page }) => {
   let requestCount = 0;
   await openTransferPage(page);
   await page.route("**/api/backend/funds/transfer", (route) => {
@@ -201,9 +253,38 @@ test("validates the reported source balance before submitting", async ({ page })
     return route.fulfill({ status: 201, json: transferResponse() });
   });
 
-  await submitAmount(page, "50");
-  await expect(page.getByText("Amount exceeds the reported account balance")).toBeVisible();
+  await page.getByLabel("Transfer amount (USD)").fill("20.01");
+  await expect(
+    page.getByText("Amount exceeds available balance (20.00 USD)."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Transfer Funds" }),
+  ).toBeDisabled();
   expect(requestCount).toBe(0);
+});
+
+test("does not fall back to total balance when available balance is missing", async ({
+  page,
+}) => {
+  const accountsWithoutAvailableBalance = accountsResponse.data.map(
+    (account) => {
+      const accountWithoutAvailableBalance: AccountFixture = { ...account };
+      delete accountWithoutAvailableBalance.availableBalance;
+      return accountWithoutAvailableBalance;
+    },
+  );
+  await openTransferPage(page, accountsWithoutAvailableBalance);
+
+  await expect(page.getByText("Unavailable")).toHaveCount(2);
+  await page.getByLabel("Transfer amount (USD)").fill("1");
+  await expect(
+    page.getByText(
+      "Available balance is unavailable. Please refresh and try again.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Transfer Funds" }),
+  ).toBeDisabled();
 });
 
 test("retry preserves the original transfer body and key", async ({ page }) => {

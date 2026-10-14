@@ -1,14 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Empty, Form, InputNumber, Modal, Result, Select, Skeleton, Tag } from "antd";
 import type { FormProps } from "antd";
-import { ArrowDown, ArrowUp, LockKeyhole, Repeat2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  LockKeyhole,
+  Repeat2,
+  WalletCards,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { SummaryRow, TransferAccountCard } from "@/components/funds/transfer-ui";
 import { ROUTES } from "@/constants/routes";
-import { useAllTradingAccounts } from "@/hooks/useAccounts";
+import { useTradingAccounts } from "@/hooks/useAccounts";
 import { useDepositExchangeRate } from "@/hooks/useDeposit";
 import { useTransferFlow } from "@/hooks/useTransferFlow";
 import { useUserDetail } from "@/hooks/useUser";
@@ -20,6 +26,12 @@ type TransferFormValues = {
   destinationAccountNumber: string;
   amount: number;
 };
+
+const transferAccountsParams = {
+  page: 1,
+  pageSize: 100,
+  filters: {},
+} as const;
 
 function formatAmount(amount: number | string, currency: string) {
   const numericAmount = Number(amount);
@@ -37,6 +49,13 @@ function parseRate(value: string | undefined) {
   return Number.isFinite(rate) && rate > 0 ? rate : undefined;
 }
 
+function parseAvailableBalance(value: unknown) {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : undefined;
+}
+
 function accountLabel(account: TradingAccount) {
   return `${account.platform} · ${account.accountNumber} · ${account.currency}`;
 }
@@ -44,7 +63,7 @@ function accountLabel(account: TradingAccount) {
 export default function TransferForm() {
   const router = useRouter();
   const [form] = Form.useForm<TransferFormValues>();
-  const accountsQuery = useAllTradingAccounts();
+  const accountsQuery = useTradingAccounts(transferAccountsParams);
   const userQuery = useUserDetail();
   const transfer = useTransferFlow(userQuery.data?.data.id);
   const [sourceNumber, setSourceNumber] = useState("");
@@ -53,7 +72,7 @@ export default function TransferForm() {
 
   const accounts = useMemo(
     () =>
-      (accountsQuery.data?.data ?? []).filter(
+      (accountsQuery.data?.data.pageData ?? []).filter(
         (account) => account.status.trim().toUpperCase() === "ACTIVE",
       ),
     [accountsQuery.data?.data],
@@ -64,6 +83,9 @@ export default function TransferForm() {
   const destinationAccount =
     accounts.find((account) => account.accountNumber === destinationNumber) ??
     accounts[1];
+  const availableBalance = parseAvailableBalance(
+    sourceAccount?.availableBalance,
+  );
 
   const exchangeRateQuery = useDepositExchangeRate({
     fromCurrency: sourceAccount?.currency ?? "USD",
@@ -73,6 +95,17 @@ export default function TransferForm() {
   const exchangeRate = parseRate(exchangeRateQuery.data?.data.exchangeRate);
   const receivingAmount =
     amount > 0 && exchangeRate !== undefined ? amount * exchangeRate : undefined;
+  const isAmountInvalid =
+    !Number.isFinite(amount) ||
+    amount <= 0 ||
+    availableBalance === undefined ||
+    amount > availableBalance;
+
+  useEffect(() => {
+    if (form.isFieldTouched("amount")) {
+      void form.validateFields(["amount"]);
+    }
+  }, [availableBalance, form, sourceAccount?.accountNumber]);
 
   function swapAccounts() {
     if (!sourceAccount || !destinationAccount) return;
@@ -85,7 +118,15 @@ export default function TransferForm() {
   }
 
   const handleSubmit: FormProps<TransferFormValues>["onFinish"] = (values) => {
-    if (!sourceAccount || !destinationAccount || exchangeRate === undefined) return;
+    if (
+      !sourceAccount ||
+      !destinationAccount ||
+      exchangeRate === undefined ||
+      availableBalance === undefined ||
+      values.amount > availableBalance
+    ) {
+      return;
+    }
     transfer.start({
       sourceAccountNumber: values.sourceAccountNumber,
       destinationAccountNumber: values.destinationAccountNumber,
@@ -118,8 +159,6 @@ export default function TransferForm() {
     value: account.accountNumber,
     label: accountLabel(account),
   }));
-  const sourceBalance = Number(sourceAccount.balance);
-
   return (
     <>
       <Form<TransferFormValues>
@@ -152,9 +191,24 @@ export default function TransferForm() {
                   }}
                 />
               </Form.Item>
-              <p className="m-0 mt-2 text-xs font-medium text-slate-500">
-                Reported balance: {formatAmount(sourceAccount.balance, sourceAccount.currency)}
-              </p>
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+                  <WalletCards size={19} />
+                </span>
+                <div className="min-w-0">
+                  <p className="m-0 text-xs font-medium text-slate-500">
+                    Available to Transfer
+                  </p>
+                  <p className="m-0 mt-0.5 text-lg font-bold text-emerald-600">
+                    {availableBalance === undefined
+                      ? "Unavailable"
+                      : formatAmount(
+                          availableBalance,
+                          sourceAccount.currency,
+                        )}
+                  </p>
+                </div>
+              </div>
             </TransferAccountCard>
 
             <div className="relative">
@@ -217,9 +271,21 @@ export default function TransferForm() {
                           new Error("Amount must be greater than zero"),
                         );
                       }
-                      if (Number.isFinite(sourceBalance) && value > sourceBalance) {
+                      if (availableBalance === undefined) {
                         return Promise.reject(
-                          new Error("Amount exceeds the reported account balance"),
+                          new Error(
+                            "Available balance is unavailable. Please refresh and try again.",
+                          ),
+                        );
+                      }
+                      if (value > availableBalance) {
+                        return Promise.reject(
+                          new Error(
+                            `Amount exceeds available balance (${formatAmount(
+                              availableBalance,
+                              sourceAccount.currency,
+                            )}).`,
+                          ),
                         );
                       }
                       if (exchangeRateQuery.isError || exchangeRate === undefined) {
@@ -290,7 +356,8 @@ export default function TransferForm() {
                 Boolean(transfer.recoverableAttempt) ||
                 exchangeRateQuery.isLoading ||
                 exchangeRateQuery.isError ||
-                exchangeRate === undefined
+                exchangeRate === undefined ||
+                isAmountInvalid
               }
               className="!h-14 !rounded-xl !text-base !font-semibold"
             >
@@ -370,6 +437,8 @@ function TransferSummary({
   receivingAmount?: number;
   exchangeRate?: number;
 }) {
+  const availableBalance = parseAvailableBalance(source.availableBalance);
+
   return (
     <Card bordered={false} className="!rounded-2xl !bg-[#071d3e] !shadow-lg">
       <div className="mb-8 flex items-center gap-3">
@@ -379,6 +448,15 @@ function TransferSummary({
         <h2 className="m-0 text-xl font-bold text-white">Transfer Summary</h2>
       </div>
       <SummaryRow label="From" value={accountLabel(source)} />
+      <SummaryRow
+        label="Available to Transfer"
+        value={
+          availableBalance === undefined
+            ? "Unavailable"
+            : formatAmount(availableBalance, source.currency)
+        }
+      />
+      <div className="my-5 border-t border-white/10" />
       <SummaryRow label="To" value={accountLabel(destination)} />
       <div className="my-5 border-t border-white/10" />
       <SummaryRow label="Account Deduction" value={formatAmount(amount, source.currency)} />
