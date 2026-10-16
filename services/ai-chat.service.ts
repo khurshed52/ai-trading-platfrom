@@ -1,10 +1,5 @@
 export type AiChatRole = "user" | "assistant";
 
-export type AiChatHistoryItem = {
-  role: AiChatRole;
-  content: string;
-};
-
 export type AiAnswerSourceType =
   | "company_policy"
   | "gemini"
@@ -27,7 +22,6 @@ export type AiChatAttachment = {
 
 type StreamAiChatRequest = {
   message: string;
-  history: AiChatHistoryItem[];
   file?: AiChatAttachment;
   signal?: AbortSignal;
   onChunk: (content: string, source?: AiAnswerSource) => void;
@@ -56,7 +50,6 @@ export class AiChatRequestError extends Error {
 
 export async function streamAiChat({
   message,
-  history,
   file,
   signal,
   onChunk,
@@ -64,7 +57,7 @@ export async function streamAiChat({
   content: string;
   source?: AiAnswerSource;
 }> {
-  const requestBody = JSON.stringify({ message, history, file });
+  const requestBody = JSON.stringify({ message, file });
   let response = await sendChatRequest(requestBody, signal);
 
   if (response.status === 401) {

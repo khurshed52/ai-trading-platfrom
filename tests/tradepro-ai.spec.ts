@@ -82,6 +82,26 @@ test("renders real account activity and uses the shared AI endpoint", async ({
       },
     }),
   );
+  await page.route("**/api/backend/notifications/**", (route) => {
+    const isUnreadCount = route.request().url().endsWith("/unread-count");
+
+    return route.fulfill({
+      status: 200,
+      json: {
+        statusCode: 200,
+        message: "Notifications retrieved successfully",
+        data: isUnreadCount
+          ? { unreadCount: 0 }
+          : {
+              page: 1,
+              pageSize: 5,
+              dataCount: 0,
+              pageCount: 0,
+              pageData: [],
+            },
+      },
+    });
+  });
 
   let aiPayload: unknown;
   let aiRequestCount = 0;
@@ -108,6 +128,18 @@ test("renders real account activity and uses the shared AI endpoint", async ({
           code: "AUTH_REQUIRED",
           message: "Your session has expired. Please log in again.",
           loginUrl: "/login",
+        },
+      });
+      return;
+    }
+
+    if (aiRequestCount === 3) {
+      await route.fulfill({
+        status: 503,
+        json: {
+          code: "AI_TEMPORARILY_UNAVAILABLE",
+          message:
+            "The AI assistant is temporarily busy. Please wait a moment and try again.",
         },
       });
       return;
@@ -177,10 +209,26 @@ test("renders real account activity and uses the shared AI endpoint", async ({
   ).toBeVisible();
   expect(aiPayload).toMatchObject({
     message: "Show my trading accounts",
-    history: [],
   });
+  expect(aiPayload).not.toHaveProperty("history");
   expect(refreshRequestCount).toBe(1);
   expect(aiRequestCount).toBe(2);
+
+  const chatInput = page.getByPlaceholder(
+    "Ask anything about your trading journey...",
+  );
+  await chatInput.fill("Explain leverage");
+  await chatInput.press("Enter");
+  await expect(
+    page
+      .getByRole("log", { name: "TradePro AI messages" })
+      .getByText(
+        "The AI assistant is temporarily busy. Please wait a moment and try again.",
+      ),
+  ).toBeVisible();
+  await expect(page.getByText(/\{"error":/)).toHaveCount(0);
+  expect(aiRequestCount).toBe(3);
+
   await expect(
     page.getByRole("link", { name: "TradePro AI", exact: true }),
   ).toHaveAttribute("href", "/tradepro-ai");

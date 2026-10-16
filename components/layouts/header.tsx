@@ -30,6 +30,7 @@ import {
 import { useUserDetail } from "@/hooks/useUser";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { notificationKeys } from "@/hooks/useNotifications";
+import { HeaderAssistantLink } from "./header-assistant-link";
 
 type DashboardHeaderProps = {
   collapsed: boolean;
@@ -132,10 +133,22 @@ export default function DashboardHeader({
           className="!inline-flex !size-11 !items-center !justify-center !rounded-xl !bg-slate-50 !text-lg !text-slate-700 lg:!hidden"
         />
 
-        <div className="flex-1" />
+        <div className="flex min-w-0 flex-1 justify-end pl-2 pr-1 xl:pl-5">
+          <HeaderAssistantLink />
+        </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          <span
+            aria-hidden="true"
+            className="hidden h-9 w-px bg-slate-200 xl:block"
+          />
+
           <NotificationBell />
+
+          <span
+            aria-hidden="true"
+            className="hidden h-9 w-px bg-slate-200 sm:block"
+          />
 
           <Dropdown
             menu={{

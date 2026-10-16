@@ -303,16 +303,6 @@ export default function GeminiChat() {
     try {
       await streamAiChat({
         message,
-        history: messages
-          .filter(
-            (chatMessage, index) =>
-              index > 0 && chatMessage.content.trim(),
-          )
-          .slice(-12)
-          .map((chatMessage) => ({
-            role: chatMessage.role,
-            content: chatMessage.content,
-          })),
         file: selectedAttachment
           ? {
               name: selectedAttachment.name,
@@ -347,6 +337,9 @@ export default function GeminiChat() {
         error instanceof AiChatRequestError &&
         error.status === 401 &&
         error.code === "AUTH_REQUIRED";
+      const temporaryAiFailure =
+        error instanceof AiChatRequestError &&
+        error.code === "AI_TEMPORARILY_UNAVAILABLE";
       const errorMessage = error instanceof Error
         ? error.message
         : "Something went wrong.";
@@ -354,7 +347,9 @@ export default function GeminiChat() {
         ? `${errorMessage}\n\n[Log in to continue](${
             error.loginUrl || "/login"
           })`
-        : `Sorry, I could not respond: ${errorMessage}`;
+        : temporaryAiFailure
+          ? errorMessage
+          : `Sorry, I could not respond: ${errorMessage}`;
 
       setMessages((currentMessages) =>
         currentMessages.map((chatMessage) =>

@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AUTH_LOGOUT_EVENT } from "@/lib/auth-events";
-import { streamAiChat } from "@/services/ai-chat.service";
+import {
+  AiChatRequestError,
+  streamAiChat,
+} from "@/services/ai-chat.service";
 import { useUserDetail } from "@/hooks/useUser";
 
 import type {
@@ -223,10 +226,6 @@ export function useTradeProAiChat() {
     try {
       await streamAiChat({
         message: prompt,
-        history: (currentConversation?.messages ?? [])
-          .filter(({ content }) => content.trim())
-          .slice(-12)
-          .map(({ role, content }) => ({ role, content })),
         signal: abortController.signal,
         onChunk: (content, source) => {
           updateConversation(conversationId, (conversation) => ({
@@ -244,6 +243,9 @@ export function useTradeProAiChat() {
         return;
       }
 
+      const temporaryAiFailure =
+        error instanceof AiChatRequestError &&
+        error.code === "AI_TEMPORARILY_UNAVAILABLE";
       const errorMessage = error instanceof Error
         ? error.message
         : "Unable to contact the assistant.";
@@ -254,7 +256,9 @@ export function useTradeProAiChat() {
           message.id === assistantMessage.id
             ? {
                 ...message,
-                content: `Sorry, I could not respond: ${errorMessage}`,
+                content: temporaryAiFailure
+                  ? errorMessage
+                  : `Sorry, I could not respond: ${errorMessage}`,
                 failedPrompt: prompt,
               }
             : message,

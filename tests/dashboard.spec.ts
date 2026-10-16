@@ -170,6 +170,21 @@ test("renders the redesigned dashboard and preserves navigation", async ({
   await expect(
     page.getByRole("link", { name: /Open Account Create New/ }),
   ).toHaveAttribute("href", "/accounts");
+
+  const assistantLink = page.getByRole("link", {
+    name: "Open TradePro Assistant",
+  });
+  await expect(assistantLink).toBeVisible();
+  await expect(assistantLink).toHaveAttribute("href", "/tradepro-ai");
+  await expect(assistantLink).toContainText(
+    "balances, deposits, withdrawals",
+  );
+  await expect(assistantLink).toContainText(
+    "transactions, account status, market news",
+    { timeout: 6_000 },
+  );
+  await assistantLink.click();
+  await expect(page).toHaveURL(/\/tradepro-ai$/);
 });
 
 test("blocks protected dashboard actions and direct routes before approval", async ({
